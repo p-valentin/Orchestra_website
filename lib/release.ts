@@ -1,18 +1,17 @@
 export const VERSION = '0.9.2'
 
-const BASE = 'https://downloads.orchestra-automation.com'
+const R2 = 'https://downloads.orchestra-automation.com'
 
-export const DOWNLOADS = {
-  mac: {
-    arm64: `${BASE}/Orchestra-${VERSION}-arm64.dmg`,
-    x64: `${BASE}/Orchestra-${VERSION}-x64.dmg`,
-  },
-  windows: {
-    x64: `${BASE}/Orchestra%20Setup%20${VERSION}.exe`,
-  },
-  linux: {
-    x64: `${BASE}/Orchestra-${VERSION}.AppImage`,
-  },
+export const R2_FILES = {
+  mac:   { name: `Orchestra-${VERSION}-arm64.dmg`,      mime: 'application/x-apple-diskimage' },
+  win:   { name: `Orchestra Setup ${VERSION}.exe`,       mime: 'application/octet-stream' },
+  linux: { name: `Orchestra-${VERSION}.AppImage`,        mime: 'application/octet-stream' },
+} satisfies Record<string, { name: string; mime: string }>
+
+export type Platform = keyof typeof R2_FILES
+
+export function r2Url(platform: Platform): string {
+  return `${R2}/${encodeURIComponent(R2_FILES[platform].name)}`
 }
 
 export const GITHUB_RELEASES = `https://github.com/p-valentin/Orchestra/releases/tag/v${VERSION}`

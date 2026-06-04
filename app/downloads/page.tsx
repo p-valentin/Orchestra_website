@@ -1,4 +1,4 @@
-import { VERSION, DOWNLOADS, GITHUB_RELEASES } from '@/lib/release'
+import { VERSION, GITHUB_RELEASES } from '@/lib/release'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 
@@ -84,25 +84,19 @@ export default function DownloadsPage() {
             icon={<MacIcon />}
             name="macOS"
             note="Apple Silicon"
-            links={[
-              { label: 'Download .dmg', href: DOWNLOADS.mac.arm64 },
-            ]}
+            links={[{ label: 'Download .dmg', href: '/api/download/mac' }]}
           />
           <PlatformCard
             icon={<WindowsIcon />}
             name="Windows"
             note="x64 · Windows 10+"
-            links={[
-              { label: 'Download .exe', href: DOWNLOADS.windows.x64 },
-            ]}
+            links={[{ label: 'Download .exe', href: '/api/download/win' }]}
           />
           <PlatformCard
             icon={<LinuxIcon />}
             name="Linux"
             note="x64 · AppImage"
-            links={[
-              { label: 'Download .AppImage', href: DOWNLOADS.linux.x64 },
-            ]}
+            links={[{ label: 'Download .AppImage', href: '/api/download/linux' }]}
           />
         </div>
 
