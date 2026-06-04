@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import LogoMark from './LogoMark'
 
 const LINKS = [
-  { href: '#features', label: 'Features' },
-  { href: '#', label: 'Pricing' },
-  { href: '#contact', label: 'Contact' },
+  { href: '/#features', label: 'Features' },
+  { href: '/#download', label: 'Pricing' },
+  { href: '/#contact', label: 'Contact' },
 ]
 
 export default function Nav() {

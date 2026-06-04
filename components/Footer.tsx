@@ -23,7 +23,7 @@ export default function Footer() {
 
         {/* legal */}
         <div className="md:text-right">
-          <p className="text-sm text-text-secondary">© 2025 Orchestra</p>
+          <p className="text-sm text-text-secondary">© 2026 Orchestra</p>
           <p className="mt-1 text-sm text-text-secondary">orchestra-automation.com</p>
           <a
             href="mailto:hello@orchestra-automation.com"

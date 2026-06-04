@@ -1,6 +1,7 @@
 import { VERSION } from '@/lib/release'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
+import BetaSignup from '@/components/BetaSignup'
 
 type PlatformCardProps = {
   icon: React.ReactNode
@@ -63,9 +64,9 @@ function LinuxIcon() {
 
 export default function DownloadsPage() {
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       <Nav />
-      <main className="mx-auto max-w-5xl px-5 pb-32 pt-40 sm:px-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-32 pt-40 sm:px-8">
         <div className="mb-4 flex items-center gap-3">
           <span className="rounded-full border border-teal/40 bg-teal/10 px-3 py-1 font-mono text-xs text-teal">
             v{VERSION} · Free beta
@@ -76,7 +77,7 @@ export default function DownloadsPage() {
           Download Orchestra.
         </h1>
         <p className="mt-5 max-w-xl text-lg leading-relaxed text-text-secondary">
-          Free during the beta. Claim your license below and it stays free for you when 1.0 ships.
+          Free during the beta — claim your license and it stays free for you when 1.0 ships.
         </p>
 
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -100,8 +101,11 @@ export default function DownloadsPage() {
           />
         </div>
 
+        <div className="mt-14 max-w-lg">
+          <BetaSignup />
+        </div>
       </main>
       <Footer />
-    </>
+    </div>
   )
 }
