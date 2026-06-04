@@ -42,14 +42,14 @@ function Service() {
         Need it built for you?
       </h3>
       <p className="mt-4 leading-relaxed text-text-secondary">
-        I take on a small number of automation projects — from simple login flows to complex
+        I'll build a custom automation for you — from simple login flows to complex 
         multi-step workflows. Built with Orchestra, delivered as code you own.
       </p>
       <a
         href="#contact"
         className="mt-7 inline-flex items-center gap-2 rounded-lg border border-navy px-6 py-3 font-medium text-text-primary transition-colors hover:border-teal hover:text-teal"
       >
-        Get in touch →
+        Hire me →
       </a>
     </>
   )
