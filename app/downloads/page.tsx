@@ -1,4 +1,4 @@
-import { VERSION, GITHUB_RELEASES } from '@/lib/release'
+import { VERSION } from '@/lib/release'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 
@@ -100,13 +100,6 @@ export default function DownloadsPage() {
           />
         </div>
 
-        <p className="mt-8 text-sm text-text-secondary">
-          All releases are also available on{' '}
-          <a href={GITHUB_RELEASES} className="text-text-primary underline underline-offset-2 hover:text-teal transition-colors">
-            GitHub Releases
-          </a>
-          .
-        </p>
       </main>
       <Footer />
     </>
