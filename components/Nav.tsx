@@ -38,7 +38,7 @@ export default function Nav() {
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
-        <a href="#top" className="flex items-center gap-2.5" aria-label="Orchestra home">
+        <a href="/" className="flex items-center gap-2.5" aria-label="Orchestra home">
           <LogoMark size={38} priority className="h-9 w-9" />
           <span className="font-display text-2xl font-semibold tracking-tight text-text-primary">Orchestra</span>
         </a>

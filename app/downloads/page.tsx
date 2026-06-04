@@ -76,10 +76,6 @@ export default function DownloadsPage() {
         <h1 className="font-display text-5xl font-semibold leading-[0.98] tracking-tight text-text-primary sm:text-6xl">
           Download Orchestra.
         </h1>
-        <p className="mt-5 max-w-xl text-lg leading-relaxed text-text-secondary">
-          Free during the beta — claim your license and it stays free for you when 1.0 ships.
-        </p>
-
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <PlatformCard
             icon={<MacIcon />}
