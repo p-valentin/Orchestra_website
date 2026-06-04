@@ -71,12 +71,18 @@ export async function submitContact(
 }
 
 async function sendBetaClaim(email: string): Promise<void> {
-  const url = process.env.BETA_SIGNUP_URL
-  if (url) {
-    await fetch(url, {
+  const apiKey = process.env.RESEND_API_KEY
+  const to = process.env.CONTACT_EMAIL
+  if (apiKey && to) {
+    await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: new URLSearchParams({ email, source: 'orchestra-landing' }).toString(),
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM ?? 'Orchestra <onboarding@resend.dev>',
+        to,
+        subject: 'New beta claim',
+        text: `${email} just claimed a free beta license.`,
+      }),
     }).catch(() => {})
     return
   }
