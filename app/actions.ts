@@ -55,7 +55,7 @@ export async function submitContact(
 
   const errors: ContactState['errors'] = {}
   if (name.length < 2) errors.name = 'Please tell me your name.'
-  if (!isValidEmail(email)) errors.email = 'That email address doesn't look right.'
+  if (!isValidEmail(email)) errors.email = "That email address doesn't look right."
   if (message.length < 10) errors.message = 'A little more detail, please (10+ characters).'
 
   if (Object.keys(errors).length > 0) {
@@ -68,13 +68,13 @@ export async function submitContact(
     email,
   )
 
-  return { ok: true, message: 'Thanks — your message is on its way. I'll reply within a day or two.', errors: {} }
+  return { ok: true, message: "Thanks — your message is on its way. I'll reply within a day or two.", errors: {} }
 }
 
 export async function claimBeta(_prev: BetaState, formData: FormData): Promise<BetaState> {
   const honeypot = formData.get('company')
   if (typeof honeypot === 'string' && honeypot.trim() !== '') {
-    return { ok: true, message: 'You're in — we'll email your license at 1.0.' }
+    return { ok: true, message: "You're in — we'll email your license at 1.0." }
   }
 
   const limit = rateLimit('beta:' + (await requestIp()))
@@ -89,9 +89,9 @@ export async function claimBeta(_prev: BetaState, formData: FormData): Promise<B
 
   const email = sanitizeText(formData.get('email'), 254)
   if (!isValidEmail(email)) {
-    return { ok: false, message: '', error: 'That email address doesn't look right.' }
+    return { ok: false, message: '', error: "That email address doesn't look right." }
   }
 
   await sendEmail('New beta claim', `${email} just claimed a free beta license.`)
-  return { ok: true, message: 'You're in — we'll email your free license when 1.0 ships.' }
+  return { ok: true, message: "You're in — we'll email your free license when 1.0 ships." }
 }
