@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import LogoMark from './LogoMark'
 
 const LINKS = [
-  { href: '/#features', label: 'Features' },
-  { href: '/#download', label: 'Pricing' },
-  { href: '/#contact', label: 'Contact' },
+  { href: '/#features', label: 'Features', soon: false },
+  { href: null, label: 'Pricing', soon: true },
+  { href: '/#contact', label: 'Contact', soon: false },
 ]
 
 export default function Nav() {
@@ -44,15 +44,22 @@ export default function Nav() {
         </a>
 
         <nav className="hidden items-center gap-9 md:flex" aria-label="Primary">
-          {LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
-            >
-              {link.label}
-            </a>
-          ))}
+          {LINKS.map((link) =>
+            link.soon ? (
+              <span key={link.label} className="flex items-center gap-1.5 text-sm font-medium text-text-secondary/40 cursor-default select-none">
+                {link.label}
+                <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-navy/60 text-text-secondary/60">Soon</span>
+              </span>
+            ) : (
+              <a
+                key={link.label}
+                href={link.href!}
+                className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
+              >
+                {link.label}
+              </a>
+            )
+          )}
         </nav>
 
         <a
@@ -90,16 +97,23 @@ export default function Nav() {
 
       {open && (
         <div className="fixed inset-0 top-[65px] z-40 flex flex-col gap-2 bg-[#0b0a08] px-6 py-8 md:hidden">
-          {LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              onClick={() => setOpen(false)}
-              className="border-b border-subtle py-4 font-display text-3xl font-medium tracking-tight text-text-primary"
-            >
-              {link.label}
-            </a>
-          ))}
+          {LINKS.map((link) =>
+            link.soon ? (
+              <span key={link.label} className="flex items-center gap-3 border-b border-subtle py-4 font-display text-3xl font-medium tracking-tight text-text-secondary/40">
+                {link.label}
+                <span className="rounded px-2 py-1 text-xs font-semibold uppercase tracking-wider bg-navy/60 text-text-secondary/60">Soon</span>
+              </span>
+            ) : (
+              <a
+                key={link.label}
+                href={link.href!}
+                onClick={() => setOpen(false)}
+                className="border-b border-subtle py-4 font-display text-3xl font-medium tracking-tight text-text-primary"
+              >
+                {link.label}
+              </a>
+            )
+          )}
           <a
             href="#download"
             onClick={() => setOpen(false)}
