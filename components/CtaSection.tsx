@@ -12,8 +12,7 @@ export default function CtaSection() {
             <span className="italic font-medium text-teal">Free beta.</span>
           </h2>
           <a
-            href="/downloads/Orchestra-0.1.0-beta.arm64.dmg"
-            download
+            href="/downloads"
             className="mt-8 inline-flex items-center gap-2.5 rounded-lg bg-teal px-7 py-3.5 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5"
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
