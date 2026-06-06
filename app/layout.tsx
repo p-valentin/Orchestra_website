@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Fraunces, DM_Sans, JetBrains_Mono } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 
 const fraunces = Fraunces({
@@ -56,7 +58,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${fraunces.variable} ${dmSans.variable} ${jetbrains.variable}`}>
-      <body className="font-sans bg-bg text-text-primary">{children}</body>
+      <body className="font-sans bg-bg text-text-primary">
+        {children}
+        <Analytics />
+        <SpeedInsights />
+      </body>
     </html>
   )
 }

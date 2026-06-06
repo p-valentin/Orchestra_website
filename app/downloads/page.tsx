@@ -2,15 +2,16 @@ import { VERSION } from '@/lib/release'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import BetaSignup from '@/components/BetaSignup'
+import DownloadButton from '@/components/DownloadButton'
 
 type PlatformCardProps = {
   icon: React.ReactNode
   name: string
   note: string
-  links: { label: string; href: string }[]
+  button: React.ReactNode
 }
 
-function PlatformCard({ icon, name, note, links }: PlatformCardProps) {
+function PlatformCard({ icon, name, note, button }: PlatformCardProps) {
   return (
     <div className="flex flex-col gap-5 rounded-2xl border border-subtle bg-surface/60 p-8">
       <div className="flex items-center gap-4">
@@ -20,20 +21,7 @@ function PlatformCard({ icon, name, note, links }: PlatformCardProps) {
           <div className="text-sm text-text-secondary">{note}</div>
         </div>
       </div>
-      <div className="flex flex-col gap-2.5">
-        {links.map((link) => (
-          <a
-            key={link.label}
-            href={link.href}
-            className="inline-flex items-center gap-2.5 rounded-lg bg-teal px-5 py-3 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />
-            </svg>
-            {link.label}
-          </a>
-        ))}
-      </div>
+      {button}
     </div>
   )
 }
@@ -81,19 +69,19 @@ export default function DownloadsPage() {
             icon={<MacIcon />}
             name="macOS"
             note="Apple Silicon"
-            links={[{ label: 'Download .dmg', href: '/api/download/mac' }]}
+            button={<DownloadButton platform="mac" arch="arm64" label="Download .dmg" className="inline-flex items-center gap-2.5 rounded-lg bg-teal px-5 py-3 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5" />}
           />
           <PlatformCard
             icon={<WindowsIcon />}
             name="Windows"
             note="x64 · Windows 10+"
-            links={[{ label: 'Download .exe', href: '/api/download/win' }]}
+            button={<DownloadButton platform="win" arch="x64" label="Download .exe" className="inline-flex items-center gap-2.5 rounded-lg bg-teal px-5 py-3 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5" />}
           />
           <PlatformCard
             icon={<LinuxIcon />}
             name="Linux"
             note="x64 · AppImage"
-            links={[{ label: 'Download .AppImage', href: '/api/download/linux' }]}
+            button={<DownloadButton platform="linux" arch="x64" label="Download .AppImage" className="inline-flex items-center gap-2.5 rounded-lg bg-teal px-5 py-3 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5" />}
           />
         </div>
 
