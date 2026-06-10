@@ -1,38 +1,30 @@
 import { type NextRequest } from 'next/server'
-import { VERSION } from '@/lib/release'
-
-const FILE_MAP: Record<string, Record<string, string>> = {
-  mac: {
-    arm64: `Orchestra-${VERSION}-arm64.dmg`,
-  },
-  win: {
-    x64: `Orchestra Setup ${VERSION}.exe`,
-  },
-  linux: {
-    x64: `Orchestra-${VERSION}.AppImage`,
-  },
-}
+import { filesFor, type Platform } from '@/lib/release'
+import { liveVersion } from '@/lib/releases'
+import { recordDownload } from '@/lib/stats'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const platform = searchParams.get('platform') ?? 'mac'
   const arch = searchParams.get('arch') ?? 'arm64'
 
+  const version = await liveVersion()
+  const country = request.headers.get('x-vercel-ip-country') ?? 'unknown'
+
   console.log(JSON.stringify({
     event: 'orchestra_download',
-    version: VERSION,
+    version,
     platform,
     arch,
     timestamp: new Date().toISOString(),
     userAgent: request.headers.get('user-agent') ?? 'unknown',
     referer: request.headers.get('referer') ?? 'direct',
-    country: request.headers.get('x-vercel-ip-country') ?? 'unknown',
+    country,
     city: request.headers.get('x-vercel-ip-city') ?? 'unknown',
   }))
 
-  const filename = FILE_MAP[platform]?.[arch]
-
-  if (!filename) {
+  const file = filesFor(version)[platform as Platform]
+  if (!file) {
     return new Response('File not found', { status: 404 })
   }
 
@@ -41,5 +33,7 @@ export async function GET(request: NextRequest) {
     return new Response('Download unavailable', { status: 503 })
   }
 
-  return Response.redirect(`${base}/${encodeURIComponent(filename)}`, 302)
+  await recordDownload(platform, country).catch(() => {})
+
+  return Response.redirect(`${base}/${encodeURIComponent(file.name)}`, 302)
 }

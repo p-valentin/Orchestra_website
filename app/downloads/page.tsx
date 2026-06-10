@@ -1,4 +1,4 @@
-import { VERSION } from '@/lib/release'
+import { liveVersion } from '@/lib/releases'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import BetaSignup from '@/components/BetaSignup'
@@ -50,13 +50,16 @@ function LinuxIcon() {
   )
 }
 
-export default function DownloadsPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function DownloadsPage() {
+  const version = await liveVersion()
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
       <main className="hero-light mx-auto w-full max-w-5xl flex-1 px-5 pb-32 pt-40 sm:px-8">
         <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-brass">
-          v{VERSION} · free beta
+          v{version} · free beta
         </p>
 
         <h1 className="font-display text-5xl font-medium leading-[1.0] tracking-tight sm:text-6xl">
@@ -72,19 +75,19 @@ export default function DownloadsPage() {
             icon={<MacIcon />}
             name="macOS"
             note="Apple Silicon"
-            button={<DownloadButton platform="mac" arch="arm64" label="Download .dmg" />}
+            button={<DownloadButton platform="mac" arch="arm64" label="Download .dmg" version={version} />}
           />
           <PlatformCard
             icon={<WindowsIcon />}
             name="Windows"
             note="x64 · Windows 10+"
-            button={<DownloadButton platform="win" arch="x64" label="Download .exe" />}
+            button={<DownloadButton platform="win" arch="x64" label="Download .exe" version={version} />}
           />
           <PlatformCard
             icon={<LinuxIcon />}
             name="Linux"
             note="x64 · AppImage"
-            button={<DownloadButton platform="linux" arch="x64" label="Download .AppImage" />}
+            button={<DownloadButton platform="linux" arch="x64" label="Download .AppImage" version={version} />}
           />
         </div>
 

@@ -1,24 +1,28 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { R2_FILES, r2Url, type Platform } from '@/lib/release'
-
-export const runtime = 'edge'
+import { filesFor, r2Url, type Platform } from '@/lib/release'
+import { liveVersion } from '@/lib/releases'
+import { recordDownload } from '@/lib/stats'
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ platform: string }> },
 ) {
   const { platform } = await params
-  const file = R2_FILES[platform as Platform]
+  const version = await liveVersion()
+  const file = filesFor(version)[platform as Platform]
 
   if (!file) {
     return NextResponse.json({ error: 'unknown platform' }, { status: 404 })
   }
 
-  const upstream = await fetch(r2Url(platform as Platform))
+  const upstream = await fetch(r2Url(platform as Platform, version))
 
   if (!upstream.ok || !upstream.body) {
     return NextResponse.json({ error: 'file unavailable' }, { status: 502 })
   }
+
+  const country = req.headers.get('x-vercel-ip-country') ?? 'unknown'
+  await recordDownload(platform, country).catch(() => {})
 
   return new NextResponse(upstream.body, {
     headers: {

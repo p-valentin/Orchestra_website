@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import TrackPageview from '@/components/TrackPageview'
 import './globals.css'
 
 const fraunces = Fraunces({
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable}`}>
       <body className="bg-bg font-sans text-fg">
         {children}
+        <TrackPageview />
         <Analytics />
         <SpeedInsights />
       </body>

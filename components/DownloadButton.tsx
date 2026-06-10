@@ -11,6 +11,7 @@ type Props = {
   arch: 'arm64' | 'x64'
   label: string
   className?: string
+  version?: string
 }
 
 const NOTICES: Record<'mac' | 'win', { intro: string; steps: string[]; note: string }> = {
@@ -114,12 +115,12 @@ function Notice({
   )
 }
 
-export default function DownloadButton({ platform, arch, label, className }: Props) {
+export default function DownloadButton({ platform, arch, label, className, version = VERSION }: Props) {
   const [open, setOpen] = useState(false)
   const href = `/api/download?platform=${platform}&arch=${arch}`
   const needsNotice = platform === 'mac' || platform === 'win'
 
-  const fireTrack = () => track('download_click', { version: VERSION, platform, arch })
+  const fireTrack = () => track('download_click', { version, platform, arch })
 
   return (
     <>
