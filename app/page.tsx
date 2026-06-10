@@ -1,9 +1,11 @@
 import Nav from '@/components/Nav'
 import Hero from '@/components/Hero'
-import Features from '@/components/Features'
-import Translation from '@/components/Translation'
-import Transparency from '@/components/Transparency'
-import CtaSection from '@/components/CtaSection'
+import InstrumentMarquee from '@/components/InstrumentMarquee'
+import HowItWorks from '@/components/HowItWorks'
+import FeatureSplits from '@/components/FeatureSplits'
+import CodeOwnership from '@/components/CodeOwnership'
+import UseCases from '@/components/UseCases'
+import DownloadCta from '@/components/DownloadCta'
 import ContactForm from '@/components/ContactForm'
 import Footer from '@/components/Footer'
 
@@ -13,10 +15,12 @@ export default function Page() {
       <Nav />
       <main>
         <Hero />
-        <Features />
-        <Translation />
-        <Transparency />
-        <CtaSection />
+        <InstrumentMarquee />
+        <HowItWorks />
+        <FeatureSplits />
+        <CodeOwnership />
+        <UseCases />
+        <DownloadCta />
         <ContactForm />
       </main>
       <Footer />

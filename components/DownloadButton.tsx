@@ -15,7 +15,10 @@ export default function DownloadButton({ platform, arch, label, className }: Pro
     <a
       href={`/api/download?platform=${platform}&arch=${arch}`}
       onClick={() => track('download_click', { version: VERSION, platform, arch })}
-      className={className}
+      className={
+        className ??
+        'inline-flex items-center gap-2.5 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright'
+      }
     >
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />

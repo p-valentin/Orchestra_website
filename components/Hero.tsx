@@ -1,76 +1,58 @@
-import ProductShot from './ProductShot'
+import FlowDemo from './FlowDemo'
 
-const STATS = [
-  { value: '40+', label: 'instruments' },
-  { value: '100%', label: 'your code' },
-  { value: '0', label: 'lock-in' },
-]
+const TRUST = ['Runs on your machine', 'No account needed', 'Exports plain Playwright', 'Free during beta']
 
 export default function Hero() {
   return (
-    <section id="top" className="relative overflow-hidden pt-32 sm:pt-40">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 sm:px-8 lg:grid-cols-[1.02fr_0.98fr] lg:gap-10 lg:pb-28">
+    <section id="top" className="hero-light relative pt-32 sm:pt-40">
+      <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 pb-16 sm:px-8 lg:grid-cols-[1fr_1fr] lg:gap-12 lg:pb-24">
         <div>
-          <div className="mb-8 flex items-center gap-3.5">
-            <span className="h-px w-9 bg-teal/60" />
-            <span className="text-xs uppercase tracking-[0.26em] text-teal">
-              Browser automation, conducted
-            </span>
-          </div>
-
-          <h1 className="font-display text-6xl font-semibold leading-[0.95] tracking-tight text-text-primary sm:text-7xl lg:text-[5.25rem]">
-            You conduct.
-            <span className="block italic font-medium text-teal">It plays.</span>
+          <h1 className="font-display text-5xl font-medium leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.4rem]">
+            Automate any website.
+            <span className="block text-brass">Keep the code.</span>
           </h1>
 
-          <p className="mt-8 max-w-md text-lg leading-relaxed text-text-secondary">
-            Orchestra turns repetitive browser work into a score you arrange by hand — every step
-            visible, every line of Playwright yours to keep.
+          <p className="mt-7 max-w-lg text-lg leading-relaxed text-muted">
+            Orchestra is a desktop studio for browser automation. Build your flow from visual steps,
+            watch it run live in a real browser, and export plain Playwright that runs anywhere —
+            no subscription holding it hostage.
           </p>
 
-          <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-4">
+          <div className="mt-9 flex flex-wrap items-center gap-4">
             <a
               href="/downloads"
-              className="inline-flex items-center gap-2.5 rounded-lg bg-teal px-7 py-3.5 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2.5 rounded-lg bg-brass px-7 py-3.5 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
             >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />
               </svg>
-              Download now
+              Download for desktop
             </a>
             <a
-              href="#contact"
-              className="border-b border-navy pb-1 font-medium text-text-primary transition-colors hover:border-teal hover:text-teal"
+              href="#how"
+              className="inline-flex items-center gap-2 rounded-lg border border-line-strong px-6 py-3.5 font-medium text-fg transition-colors hover:border-brass/60 hover:text-brass-bright"
             >
-              Need it built? →
+              See how it works
             </a>
           </div>
 
-          <dl className="mt-12 flex gap-9">
-            {STATS.map((stat) => (
-              <div key={stat.label}>
-                <dt className="font-display text-3xl font-semibold tracking-tight text-text-primary">
-                  {stat.value}
-                </dt>
-                <dd className="mt-1 text-xs uppercase tracking-wider text-text-secondary">
-                  {stat.label}
-                </dd>
-              </div>
+          <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2">
+            {TRUST.map((item) => (
+              <li key={item} className="flex items-center gap-2 text-[13px] text-muted">
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="#d9b36a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M2.5 8.5l3.5 3.5L13.5 4" />
+                </svg>
+                {item}
+              </li>
             ))}
-          </dl>
+          </ul>
         </div>
 
-        <div className="lg:pl-4">
-          <ProductShot
-            src="/shots/app.png"
-            alt="The Orchestra app: a visual flow of Navigate, Extract and Output steps driving a live web page, with the scraped result in the console."
-            width={1778}
-            height={765}
-            priority
-            sizes="(max-width: 1024px) 100vw, 620px"
-            frameClassName="w-full"
-            imgClassName="h-auto w-full"
-          />
+        <div className="lg:pl-2">
+          <FlowDemo />
+          <p className="mt-3.5 text-center font-mono text-xs text-faint">
+            A real Orchestra flow: scrape a bookstore into a CSV — six steps, zero code.
+          </p>
         </div>
       </div>
     </section>

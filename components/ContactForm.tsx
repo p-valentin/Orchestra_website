@@ -4,7 +4,6 @@ import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { submitContact } from '@/app/actions'
 import { initialContactState } from '@/lib/contact'
-import Eyebrow from './Eyebrow'
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -12,7 +11,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal px-7 py-3.5 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex items-center justify-center gap-2 rounded-lg bg-brass px-7 py-3.5 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? 'Sending…' : 'Send message'}
     </button>
@@ -20,28 +19,25 @@ function SubmitButton() {
 }
 
 const fieldBase =
-  'w-full rounded-lg border border-navy/60 bg-[#14100a] px-4 py-3 text-text-primary placeholder:text-text-secondary/60 outline-none transition-colors focus:border-teal'
+  'w-full rounded-lg border bg-well px-4 py-3 text-fg placeholder:text-faint outline-none transition-colors focus:border-brass'
 
 export default function ContactForm() {
   const [state, formAction] = useActionState(submitContact, initialContactState)
 
   return (
-    <section id="contact" className="mx-auto max-w-2xl px-5 py-24 sm:px-8 lg:py-28">
-      <Eyebrow>Get in touch</Eyebrow>
-      <h2 className="mt-5 font-display text-5xl font-semibold tracking-tight text-text-primary sm:text-6xl">
+    <section id="contact" className="mx-auto max-w-2xl px-5 py-20 sm:px-8 lg:py-24">
+      <p className="font-mono text-xs uppercase tracking-[0.18em] text-brass">Get in touch</p>
+      <h2 className="mt-4 font-display text-4xl font-medium tracking-tight sm:text-5xl">
         Start a conversation.
       </h2>
-      <p className="mt-4 text-text-secondary">
-        Whether it&apos;s a question about the beta or a project you&apos;d like built — drop a note.
+      <p className="mt-4 text-muted">
+        A question about the beta, or a job you&apos;d like automated — drop a note, I read everything.
       </p>
 
       {state.ok ? (
-        <div
-          role="status"
-          className="mt-10 rounded-xl border border-teal/40 bg-teal/10 p-6 text-text-primary"
-        >
-          <p className="font-display text-2xl tracking-wide text-teal">Message sent.</p>
-          <p className="mt-1 text-text-secondary">{state.message}</p>
+        <div role="status" className="mt-10 rounded-xl border border-brass/40 bg-brass/10 p-6">
+          <p className="font-display text-2xl tracking-tight text-brass-bright">Message sent.</p>
+          <p className="mt-1 text-muted">{state.message}</p>
         </div>
       ) : (
         <form action={formAction} className="mt-10 flex flex-col gap-5" noValidate>
@@ -57,7 +53,7 @@ export default function ContactForm() {
           )}
 
           <div>
-            <label htmlFor="name" className="mb-2 block text-sm font-medium text-text-primary">
+            <label htmlFor="name" className="mb-2 block text-sm font-medium">
               Name
             </label>
             <input
@@ -68,14 +64,14 @@ export default function ContactForm() {
               maxLength={80}
               autoComplete="name"
               aria-invalid={Boolean(state.errors.name)}
-              className={`${fieldBase} ${state.errors.name ? 'border-[#e06c63]' : 'border-subtle'}`}
+              className={`${fieldBase} ${state.errors.name ? 'border-[#e06c63]' : 'border-line-strong'}`}
               placeholder="Jane Conductor"
             />
             {state.errors.name && <p className="mt-1.5 text-sm text-[#f0a8a2]">{state.errors.name}</p>}
           </div>
 
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-text-primary">
+            <label htmlFor="email" className="mb-2 block text-sm font-medium">
               Email
             </label>
             <input
@@ -86,14 +82,14 @@ export default function ContactForm() {
               maxLength={254}
               autoComplete="email"
               aria-invalid={Boolean(state.errors.email)}
-              className={`${fieldBase} ${state.errors.email ? 'border-[#e06c63]' : 'border-subtle'}`}
+              className={`${fieldBase} ${state.errors.email ? 'border-[#e06c63]' : 'border-line-strong'}`}
               placeholder="you@company.com"
             />
             {state.errors.email && <p className="mt-1.5 text-sm text-[#f0a8a2]">{state.errors.email}</p>}
           </div>
 
           <div>
-            <label htmlFor="message" className="mb-2 block text-sm font-medium text-text-primary">
+            <label htmlFor="message" className="mb-2 block text-sm font-medium">
               Message
             </label>
             <textarea
@@ -103,7 +99,7 @@ export default function ContactForm() {
               maxLength={2000}
               rows={5}
               aria-invalid={Boolean(state.errors.message)}
-              className={`${fieldBase} resize-y ${state.errors.message ? 'border-[#e06c63]' : 'border-subtle'}`}
+              className={`${fieldBase} resize-y ${state.errors.message ? 'border-[#e06c63]' : 'border-line-strong'}`}
               placeholder="Tell me what you'd like to automate…"
             />
             {state.errors.message && <p className="mt-1.5 text-sm text-[#f0a8a2]">{state.errors.message}</p>}

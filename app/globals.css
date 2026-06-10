@@ -12,28 +12,30 @@ html {
 
 body {
   background-color: #0b0a08;
-  background-image:
-    radial-gradient(1100px 720px at 78% -8%, rgba(210, 171, 94, 0.14), transparent 58%),
-    radial-gradient(900px 600px at 12% 18%, rgba(210, 171, 94, 0.05), transparent 60%);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  color: #f2ece1;
+  color: #f3eee2;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
+.hero-light {
+  background:
+    radial-gradient(900px 420px at 50% -180px, rgba(217, 179, 106, 0.13), transparent 70%);
+}
+
 ::selection {
-  background: #d2ab5e;
+  background: #d9b36a;
   color: #1a1306;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
-/* Visually-hidden honeypot — present in the DOM and tab order is removed,
-   but NOT display:none (bots skip display:none; this stays "fillable"). */
 .honeypot {
   position: absolute;
   left: -9999px;
@@ -43,9 +45,15 @@ body {
   opacity: 0;
 }
 
-/* Minimal CSS-only syntax colours for code snippets */
-.tok-key { color: #6fd0c4; }
-.tok-fn { color: #7fa8e0; }
-.tok-str { color: #d9a066; }
-.tok-com { color: #4a5a76; font-style: italic; }
-.tok-punc { color: #6b7a99; }
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+.step-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  border: 2px solid rgba(217, 179, 106, 0.25);
+  border-top-color: #d9b36a;
+  animation: spin 0.7s linear infinite;
+}

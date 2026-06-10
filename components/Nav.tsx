@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import LogoMark from './LogoMark'
 
 const LINKS = [
-  { href: '/#features', label: 'Features', soon: false },
-  { href: null, label: 'Pricing', soon: true },
-  { href: '/#contact', label: 'Contact', soon: false },
+  { href: '/#how', label: 'How it works' },
+  { href: '/#features', label: 'Features' },
+  { href: '/#uses', label: 'Use cases' },
+  { href: '/#contact', label: 'Contact' },
 ]
 
 export default function Nav() {
@@ -31,42 +32,35 @@ export default function Nav() {
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
         open
-          ? 'bg-[#0b0a08]'
+          ? 'bg-bg'
           : scrolled
-            ? 'border-b border-subtle bg-bg/70 backdrop-blur-md'
+            ? 'border-b border-line bg-bg/80 backdrop-blur-md'
             : 'border-b border-transparent'
       }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5 sm:px-8">
         <a href="/" className="flex items-center gap-2.5" aria-label="Orchestra home">
-          <LogoMark size={38} priority className="h-9 w-9" />
-          <span className="font-display text-2xl font-semibold tracking-tight text-text-primary">Orchestra</span>
+          <LogoMark size={34} className="h-8 w-8" />
+          <span className="font-display text-xl font-semibold tracking-tight">Orchestra</span>
         </a>
 
-        <nav className="hidden items-center gap-9 md:flex" aria-label="Primary">
-          {LINKS.map((link) =>
-            link.soon ? (
-              <span key={link.label} className="flex items-center gap-1.5 text-sm font-medium text-text-secondary/40 cursor-default select-none">
-                {link.label}
-                <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-navy/60 text-text-secondary/60">Soon</span>
-              </span>
-            ) : (
-              <a
-                key={link.label}
-                href={link.href!}
-                className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary"
-              >
-                {link.label}
-              </a>
-            )
-          )}
+        <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
+          {LINKS.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              className="text-sm text-muted transition-colors hover:text-fg"
+            >
+              {link.label}
+            </a>
+          ))}
         </nav>
 
         <a
-          href="#download"
-          className="hidden rounded-full bg-teal px-5 py-2 text-sm font-bold text-bg transition-transform hover:-translate-y-0.5 md:inline-block"
+          href="/downloads"
+          className="hidden rounded-lg bg-brass px-5 py-2 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright md:inline-block"
         >
-          Download beta
+          Download free
         </a>
 
         <button
@@ -76,50 +70,31 @@ export default function Nav() {
           onClick={() => setOpen((v) => !v)}
         >
           <span className="relative block h-4 w-6">
-            <span
-              className={`absolute left-0 block h-0.5 w-6 bg-text-primary transition-all ${
-                open ? 'top-1.5 rotate-45' : 'top-0'
-              }`}
-            />
-            <span
-              className={`absolute left-0 top-1.5 block h-0.5 w-6 bg-text-primary transition-opacity ${
-                open ? 'opacity-0' : 'opacity-100'
-              }`}
-            />
-            <span
-              className={`absolute left-0 block h-0.5 w-6 bg-text-primary transition-all ${
-                open ? 'top-1.5 -rotate-45' : 'top-3'
-              }`}
-            />
+            <span className={`absolute left-0 block h-0.5 w-6 bg-fg transition-all ${open ? 'top-1.5 rotate-45' : 'top-0'}`} />
+            <span className={`absolute left-0 top-1.5 block h-0.5 w-6 bg-fg transition-opacity ${open ? 'opacity-0' : 'opacity-100'}`} />
+            <span className={`absolute left-0 block h-0.5 w-6 bg-fg transition-all ${open ? 'top-1.5 -rotate-45' : 'top-3'}`} />
           </span>
         </button>
       </div>
 
       {open && (
-        <div className="fixed inset-0 top-[65px] z-40 flex flex-col gap-2 bg-[#0b0a08] px-6 py-8 md:hidden">
-          {LINKS.map((link) =>
-            link.soon ? (
-              <span key={link.label} className="flex items-center gap-3 border-b border-subtle py-4 font-display text-3xl font-medium tracking-tight text-text-secondary/40">
-                {link.label}
-                <span className="rounded px-2 py-1 text-xs font-semibold uppercase tracking-wider bg-navy/60 text-text-secondary/60">Soon</span>
-              </span>
-            ) : (
-              <a
-                key={link.label}
-                href={link.href!}
-                onClick={() => setOpen(false)}
-                className="border-b border-subtle py-4 font-display text-3xl font-medium tracking-tight text-text-primary"
-              >
-                {link.label}
-              </a>
-            )
-          )}
+        <div className="fixed inset-0 top-[61px] z-40 flex flex-col gap-1 bg-bg px-6 py-8 md:hidden">
+          {LINKS.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              onClick={() => setOpen(false)}
+              className="border-b border-line py-4 font-display text-2xl font-medium tracking-tight"
+            >
+              {link.label}
+            </a>
+          ))}
           <a
-            href="#download"
+            href="/downloads"
             onClick={() => setOpen(false)}
-            className="mt-4 rounded-full bg-teal px-5 py-3 text-center text-base font-bold text-bg"
+            className="mt-5 rounded-lg bg-brass px-5 py-3 text-center font-semibold text-[#1a1306]"
           >
-            Download beta
+            Download free
           </a>
         </div>
       )}

@@ -11,9 +11,9 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="shrink-0 rounded-lg bg-teal px-5 py-3 font-semibold text-[#1a1306] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className="shrink-0 rounded-lg border border-brass/50 px-5 py-3 font-medium text-brass-bright transition-colors hover:bg-brass hover:text-[#1a1306] disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending ? 'Claiming…' : 'Claim it now'}
+      {pending ? 'Claiming…' : 'Claim free license'}
     </button>
   )
 }
@@ -23,20 +23,14 @@ export default function BetaSignup() {
 
   if (state.ok) {
     return (
-      <p
-        role="status"
-        className="mt-6 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-text-primary"
-      >
+      <p role="status" className="mt-6 rounded-lg border border-brass/40 bg-brass/10 px-4 py-3 text-sm">
         ✓ {state.message}
       </p>
     )
   }
 
   return (
-    <form action={formAction} className="mt-6" noValidate>
-      <p className="mb-2.5 text-sm text-text-secondary">
-        Free during the beta — claim your license now and it stays free for you, forever.
-      </p>
+    <form action={formAction} className="mt-8 max-w-md" noValidate>
       <div className="honeypot" aria-hidden="true">
         <label htmlFor="beta-company">Company</label>
         <input id="beta-company" name="company" type="text" tabIndex={-1} autoComplete="off" />
@@ -49,7 +43,7 @@ export default function BetaSignup() {
           maxLength={254}
           autoComplete="email"
           placeholder="you@email.com"
-          className="w-full rounded-lg border border-navy/60 bg-[#14100a] px-4 py-3 text-text-primary placeholder:text-text-secondary/60 outline-none transition-colors focus:border-teal"
+          className="w-full rounded-lg border border-line-strong bg-well px-4 py-3 text-fg placeholder:text-faint outline-none transition-colors focus:border-brass"
         />
         <SubmitButton />
       </div>

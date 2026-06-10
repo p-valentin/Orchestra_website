@@ -1,51 +1,58 @@
 import type { Metadata, Viewport } from 'next'
-import { Fraunces, DM_Sans, JetBrains_Mono } from 'next/font/google'
+import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 
 const fraunces = Fraunces({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '500', '600'],
   style: ['normal', 'italic'],
   variable: '--font-fraunces',
   display: 'swap',
 })
 
-const dmSans = DM_Sans({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  variable: '--font-dm-sans',
+  variable: '--font-sans',
   display: 'swap',
 })
 
 const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
   weight: ['400', '500'],
-  variable: '--font-jetbrains',
+  variable: '--font-mono',
   display: 'swap',
 })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://orchestra-automation.com'),
-  title: 'Orchestra — You conduct. It plays.',
+  title: 'Orchestra — Automate any website. Keep the code.',
   description:
-    'Orchestra automates repetitive browser tasks visually — no code required. Every step is yours. Every action is visible.',
+    'Orchestra is a desktop studio for browser automation. Build flows visually, watch them run live, and export plain Playwright you own forever. No account, no cloud, no lock-in.',
   applicationName: 'Orchestra',
-  keywords: ['browser automation', 'visual automation', 'playwright', 'no-code', 'web scraping', 'desktop app'],
+  keywords: [
+    'browser automation',
+    'visual automation',
+    'playwright',
+    'no-code',
+    'web scraping',
+    'desktop app',
+    'automation tool',
+  ],
   openGraph: {
-    title: 'Orchestra — You conduct. It plays.',
+    title: 'Orchestra — Automate any website. Keep the code.',
     description:
-      'Automate repetitive browser tasks visually. Every step is yours. Every action is visible.',
+      'Build browser automations visually, watch them run live, export plain Playwright you own forever.',
     type: 'website',
     siteName: 'Orchestra',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Orchestra — You conduct. It plays.',
-    description: 'Automate repetitive browser tasks visually. Real code output. No lock-in.',
+    title: 'Orchestra — Automate any website. Keep the code.',
+    description:
+      'Build browser automations visually, watch them run live, export plain Playwright you own forever.',
   },
-  // favicon + apple touch icon are provided by app/icon.svg and app/apple-icon.png
   robots: { index: true, follow: true },
 }
 
@@ -57,8 +64,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${dmSans.variable} ${jetbrains.variable}`}>
-      <body className="font-sans bg-bg text-text-primary">
+    <html lang="en" className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable}`}>
+      <body className="bg-bg font-sans text-fg">
         {children}
         <Analytics />
         <SpeedInsights />

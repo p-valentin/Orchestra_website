@@ -1,4 +1,4 @@
-import { VERSION } from '@/lib/release'
+import { VERSION, GITHUB_RELEASES } from '@/lib/release'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import BetaSignup from '@/components/BetaSignup'
@@ -13,12 +13,12 @@ type PlatformCardProps = {
 
 function PlatformCard({ icon, name, note, button }: PlatformCardProps) {
   return (
-    <div className="flex flex-col gap-5 rounded-2xl border border-subtle bg-surface/60 p-8">
+    <div className="flex flex-col gap-5 rounded-xl border border-line bg-panel p-8">
       <div className="flex items-center gap-4">
-        <span className="text-teal">{icon}</span>
+        <span className="text-brass">{icon}</span>
         <div>
-          <div className="font-display text-xl font-semibold text-text-primary">{name}</div>
-          <div className="text-sm text-text-secondary">{note}</div>
+          <div className="font-display text-xl font-medium">{name}</div>
+          <div className="text-sm text-muted">{note}</div>
         </div>
       </div>
       {button}
@@ -54,38 +54,49 @@ export default function DownloadsPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-32 pt-40 sm:px-8">
-        <div className="mb-4 flex items-center gap-3">
-          <span className="rounded-full border border-teal/40 bg-teal/10 px-3 py-1 font-mono text-xs text-teal">
-            v{VERSION} · Free beta
-          </span>
-        </div>
+      <main className="hero-light mx-auto w-full max-w-5xl flex-1 px-5 pb-32 pt-40 sm:px-8">
+        <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-brass">
+          v{VERSION} · free beta
+        </p>
 
-        <h1 className="font-display text-5xl font-semibold leading-[0.98] tracking-tight text-text-primary sm:text-6xl">
+        <h1 className="font-display text-5xl font-medium leading-[1.0] tracking-tight sm:text-6xl">
           Download Orchestra.
         </h1>
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <p className="mt-5 max-w-lg text-muted">
+          No account, no card. Claim your beta license below and it stays free for you when paid
+          plans arrive.
+        </p>
+
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <PlatformCard
             icon={<MacIcon />}
             name="macOS"
             note="Apple Silicon"
-            button={<DownloadButton platform="mac" arch="arm64" label="Download .dmg" className="inline-flex items-center gap-2.5 rounded-lg bg-teal px-5 py-3 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5" />}
+            button={<DownloadButton platform="mac" arch="arm64" label="Download .dmg" />}
           />
           <PlatformCard
             icon={<WindowsIcon />}
             name="Windows"
             note="x64 · Windows 10+"
-            button={<DownloadButton platform="win" arch="x64" label="Download .exe" className="inline-flex items-center gap-2.5 rounded-lg bg-teal px-5 py-3 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5" />}
+            button={<DownloadButton platform="win" arch="x64" label="Download .exe" />}
           />
           <PlatformCard
             icon={<LinuxIcon />}
             name="Linux"
             note="x64 · AppImage"
-            button={<DownloadButton platform="linux" arch="x64" label="Download .AppImage" className="inline-flex items-center gap-2.5 rounded-lg bg-teal px-5 py-3 font-semibold text-[#1a1306] transition-transform hover:-translate-y-0.5" />}
+            button={<DownloadButton platform="linux" arch="x64" label="Download .AppImage" />}
           />
         </div>
 
-        <div className="mt-14 max-w-lg">
+        <p className="mt-6 font-mono text-xs text-faint">
+          Checksums and previous versions on{' '}
+          <a href={GITHUB_RELEASES} className="text-muted underline underline-offset-4 hover:text-fg">
+            GitHub releases
+          </a>
+          .
+        </p>
+
+        <div className="mt-12 max-w-lg">
           <BetaSignup />
         </div>
       </main>

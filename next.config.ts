@@ -4,7 +4,7 @@ const ContentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
-  "font-src fonts.gstatic.com",
+  "font-src 'self' fonts.gstatic.com",
   "img-src 'self' data:",
   "connect-src 'self'",
 ].join('; ')
