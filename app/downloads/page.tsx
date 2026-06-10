@@ -1,4 +1,4 @@
-import { VERSION, GITHUB_RELEASES } from '@/lib/release'
+import { VERSION } from '@/lib/release'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import BetaSignup from '@/components/BetaSignup'
@@ -87,14 +87,6 @@ export default function DownloadsPage() {
             button={<DownloadButton platform="linux" arch="x64" label="Download .AppImage" />}
           />
         </div>
-
-        <p className="mt-6 font-mono text-xs text-faint">
-          Checksums and previous versions on{' '}
-          <a href={GITHUB_RELEASES} className="text-muted underline underline-offset-4 hover:text-fg">
-            GitHub releases
-          </a>
-          .
-        </p>
 
         <div className="mt-12 max-w-lg">
           <BetaSignup />

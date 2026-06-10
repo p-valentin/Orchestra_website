@@ -13,5 +13,3 @@ export type Platform = keyof typeof R2_FILES
 export function r2Url(platform: Platform): string {
   return `${R2}/${encodeURIComponent(R2_FILES[platform].name)}`
 }
-
-export const GITHUB_RELEASES = `https://github.com/p-valentin/Orchestra/releases/tag/v${VERSION}`
