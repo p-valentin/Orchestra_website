@@ -3,7 +3,7 @@ import { filesFor, type Platform } from '@/lib/release'
 import { listReleases, liveVersion, type Release } from '@/lib/releases'
 import { readStats, summarize, type StatsSummary } from '@/lib/stats'
 import { storageMode } from '@/lib/store'
-import { deleteReleaseAction, saveReleaseAction, shipAction, unshipAction } from './actions'
+import { deleteReleaseAction, logoutAction, saveReleaseAction, shipAction, unshipAction } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -147,7 +147,12 @@ export default async function AdminPage() {
         <h1 className="font-display text-3xl font-medium tracking-tight">Orchestra admin</h1>
         <span className="font-mono text-xs text-faint">live v{live}</span>
         <span className="font-mono text-xs text-faint">storage: {storageMode()}</span>
-        <a href="/releases" className="ml-auto font-mono text-xs text-muted hover:text-fg">/releases →</a>
+        <div className="ml-auto flex items-center gap-4">
+          <a href="/releases" className="font-mono text-xs text-muted hover:text-fg">/releases →</a>
+          <form action={logoutAction}>
+            <button className="font-mono text-xs text-faint hover:text-fg">sign out</button>
+          </form>
+        </div>
       </header>
 
       {storageMode() === 'local' && process.env.VERCEL && (

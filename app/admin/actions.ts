@@ -1,15 +1,22 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
-import { isAdminRequest } from '@/lib/adminAuth'
+import { redirect } from 'next/navigation'
+import { SESSION_COOKIE, verifySessionToken } from '@/lib/adminAuth'
 import { deleteRelease, saveRelease, setPublished } from '@/lib/releases'
 
 const VERSION_RE = /^\d+\.\d+\.\d+$/
 
 async function requireAdmin(): Promise<void> {
-  const h = await headers()
-  if (!isAdminRequest(h.get('authorization'))) throw new Error('unauthorized')
+  const jar = await cookies()
+  if (!(await verifySessionToken(jar.get(SESSION_COOKIE)?.value))) throw new Error('unauthorized')
+}
+
+export async function logoutAction(): Promise<void> {
+  const jar = await cookies()
+  jar.delete(SESSION_COOKIE)
+  redirect('/admin/login')
 }
 
 function refresh(): void {
