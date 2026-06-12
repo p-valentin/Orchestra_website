@@ -14,8 +14,7 @@ export default function Hero() {
 
           <p className="mt-7 max-w-lg text-lg leading-relaxed text-muted">
             Orchestra is a desktop studio for browser automation. Build your flow from visual steps,
-            watch it run live in a real browser, and export plain Playwright that runs anywhere —
-            no subscription holding it hostage.
+            watch it run live in a real browser, and export plain Playwright that runs anywhere.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-4">

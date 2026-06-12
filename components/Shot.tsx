@@ -28,14 +28,6 @@ export default function Shot({
       <div
         className={`overflow-hidden rounded-xl border border-line bg-panel shadow-2xl shadow-black/60 ${frameClassName}`}
       >
-        {title && (
-          <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#3a352b]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#3a352b]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#3a352b]" />
-            <span className="ml-3 font-mono text-[11px] text-muted">{title}</span>
-          </div>
-        )}
         <Image
           src={src}
           alt={alt}
