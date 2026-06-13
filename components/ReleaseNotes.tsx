@@ -1,44 +1,36 @@
-// Renders the plain-text notes format used in the admin: blank-line separated
-// paragraphs, "- " bullets and "## " section headings. No markdown dependency.
+import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
+import remarkGfm from 'remark-gfm'
+
+const components: Components = {
+  h1: ({ children }) => <h3 className="pt-2 font-display text-lg font-medium text-fg">{children}</h3>,
+  h2: ({ children }) => <h3 className="pt-2 font-display text-lg font-medium text-fg">{children}</h3>,
+  h3: ({ children }) => <h4 className="pt-2 font-display text-base font-medium text-fg">{children}</h4>,
+  p: ({ children }) => <p className="text-[15px] leading-relaxed text-muted">{children}</p>,
+  ul: ({ children }) => <ul className="flex flex-col gap-1.5 pl-5 list-disc marker:text-brass">{children}</ul>,
+  ol: ({ children }) => <ol className="flex flex-col gap-1.5 pl-5 list-decimal marker:text-brass marker:font-mono">{children}</ol>,
+  li: ({ children }) => <li className="text-[15px] leading-relaxed text-muted">{children}</li>,
+  a: ({ children, href }) => (
+    <a href={href} className="text-brass underline hover:text-brass-bright" target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+  strong: ({ children }) => <strong className="font-semibold text-fg">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  code: ({ children }) => <code className="rounded bg-line/60 px-1.5 py-0.5 font-mono text-[13px] text-fg">{children}</code>,
+  pre: ({ children }) => <pre className="overflow-x-auto rounded-lg bg-line/60 p-3 font-mono text-[13px] text-fg">{children}</pre>,
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-2 border-brass/50 pl-3 text-[15px] leading-relaxed text-faint">{children}</blockquote>
+  ),
+  hr: () => <hr className="border-line" />,
+}
+
 export default function ReleaseNotes({ text }: { text: string }) {
-  const blocks: React.ReactNode[] = []
-  let bullets: string[] = []
-  let key = 0
-
-  const flush = () => {
-    if (!bullets.length) return
-    blocks.push(
-      <ul key={key++} className="flex flex-col gap-1.5">
-        {bullets.map((item, i) => (
-          <li key={i} className="flex items-start gap-3 text-[15px] leading-relaxed text-muted">
-            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-brass" />
-            {item}
-          </li>
-        ))}
-      </ul>,
-    )
-    bullets = []
-  }
-
-  for (const raw of text.split('\n')) {
-    const line = raw.trim()
-    if (!line) { flush(); continue }
-    if (line.startsWith('- ')) {
-      bullets.push(line.slice(2))
-      continue
-    }
-    flush()
-    if (line.startsWith('## ')) {
-      blocks.push(
-        <h3 key={key++} className="pt-2 font-display text-lg font-medium text-fg">{line.slice(3)}</h3>,
-      )
-    } else {
-      blocks.push(
-        <p key={key++} className="text-[15px] leading-relaxed text-muted">{line}</p>,
-      )
-    }
-  }
-  flush()
-
-  return <div className="flex flex-col gap-3">{blocks}</div>
+  return (
+    <div className="flex flex-col gap-3">
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
+        {text}
+      </ReactMarkdown>
+    </div>
+  )
 }

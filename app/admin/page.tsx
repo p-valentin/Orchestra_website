@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import NotesEditor from '@/components/NotesEditor'
+import ReleaseNotes from '@/components/ReleaseNotes'
 import { filesFor, type Platform } from '@/lib/release'
 import { listReleases, liveVersion, type Release } from '@/lib/releases'
 import { readStats, summarize, type StatsSummary } from '@/lib/stats'
@@ -114,16 +116,18 @@ function ReleaseRow({ release, live, binaries }: { release: Release; live: strin
           )}
         </div>
       </div>
+      <div className="mt-3 rounded-lg border border-line-strong bg-well px-3 py-2">
+        {release.notes.trim() ? (
+          <ReleaseNotes text={release.notes} />
+        ) : (
+          <p className="text-sm text-faint">No notes yet.</p>
+        )}
+      </div>
       <details className="mt-2">
         <summary className="cursor-pointer font-mono text-xs text-faint hover:text-muted">edit notes</summary>
         <form action={saveReleaseAction} className="mt-3 flex flex-col gap-2">
           <input type="hidden" name="version" value={release.version} />
-          <textarea
-            name="notes"
-            rows={8}
-            defaultValue={release.notes}
-            className="w-full rounded-lg border border-line-strong bg-well px-3 py-2 font-mono text-sm text-fg outline-none focus:border-brass"
-          />
+          <NotesEditor key={release.notes} name="notes" rows={8} defaultValue={release.notes} />
           <button className={`${btn} self-start border border-brass/50 text-brass-bright hover:bg-brass hover:text-[#1a1306]`}>
             Save notes
           </button>
@@ -133,7 +137,17 @@ function ReleaseRow({ release, live, binaries }: { release: Release; live: strin
   )
 }
 
-export default async function AdminPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  'invalid-version': 'That version doesn\'t look right — use the form X.Y.Z (e.g. 0.9.3).',
+  'save-failed': 'Could not save — the release store is unavailable. Check storage configuration and try again.',
+}
+
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
   const [releases, live, stats] = await Promise.all([listReleases(), liveVersion(), readStats()])
   const summary = summarize(stats, 30)
   const week = summarize(stats, 7)
@@ -154,6 +168,12 @@ export default async function AdminPage() {
           </form>
         </div>
       </header>
+
+      {error && ERROR_MESSAGES[error] && (
+        <p className="mt-4 rounded-lg border border-[#e06c63]/40 bg-[#e06c63]/10 px-4 py-3 text-sm text-[#f0a8a2]">
+          {ERROR_MESSAGES[error]}
+        </p>
+      )}
 
       {storageMode() === 'local' && process.env.VERCEL && (
         <p className="mt-4 rounded-lg border border-[#e06c63]/40 bg-[#e06c63]/10 px-4 py-3 text-sm text-[#f0a8a2]">
@@ -178,11 +198,11 @@ export default async function AdminPage() {
               required
               className="w-40 rounded-lg border border-line-strong bg-well px-3 py-2 font-mono text-sm text-fg outline-none focus:border-brass"
             />
-            <textarea
+            <NotesEditor
+              key={releases.length}
               name="notes"
               rows={6}
               placeholder={'## Highlights\n- New Each mode iterates DOM elements\n- Text selectors now work without a <label>'}
-              className="w-full rounded-lg border border-line-strong bg-well px-3 py-2 font-mono text-sm text-fg outline-none focus:border-brass"
             />
             <button className={`${btn} self-start bg-brass text-[#1a1306] hover:bg-brass-bright`}>Save draft</button>
           </form>

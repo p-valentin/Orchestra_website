@@ -29,8 +29,9 @@ export async function saveReleaseAction(formData: FormData): Promise<void> {
   await requireAdmin()
   const version = String(formData.get('version') ?? '').trim()
   const notes = String(formData.get('notes') ?? '').trim()
-  if (!VERSION_RE.test(version)) return
-  await saveRelease(version, notes.slice(0, 10_000))
+  if (!VERSION_RE.test(version)) redirect('/admin?error=invalid-version')
+  const ok = await saveRelease(version, notes.slice(0, 10_000))
+  if (!ok) redirect('/admin?error=save-failed')
   refresh()
 }
 
