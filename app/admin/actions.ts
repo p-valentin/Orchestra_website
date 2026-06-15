@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/adminAuth'
 import { deleteRelease, saveRelease, setPublished } from '@/lib/releases'
+import { deleteFeedback } from '@/lib/feedback'
 
 const VERSION_RE = /^\d+\.\d+\.\d+$/
 
@@ -57,4 +58,11 @@ export async function deleteReleaseAction(formData: FormData): Promise<void> {
   if (!VERSION_RE.test(version)) return
   await deleteRelease(version)
   refresh()
+}
+
+export async function deleteFeedbackAction(formData: FormData): Promise<void> {
+  await requireAdmin()
+  const id = String(formData.get('id') ?? '')
+  if (id) await deleteFeedback(id)
+  revalidatePath('/admin')
 }

@@ -5,6 +5,8 @@ import { filesFor, type Platform } from '@/lib/release'
 import { listReleases, liveVersion, type Release } from '@/lib/releases'
 import { readStats, summarize, type StatsSummary } from '@/lib/stats'
 import { storageMode } from '@/lib/store'
+import { readFeedback } from '@/lib/feedback'
+import FeedbackPanel from '@/components/FeedbackPanel'
 import { deleteReleaseAction, logoutAction, saveReleaseAction, shipAction, unshipAction } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -148,7 +150,7 @@ export default async function AdminPage({
   searchParams: Promise<{ error?: string }>
 }) {
   const { error } = await searchParams
-  const [releases, live, stats] = await Promise.all([listReleases(), liveVersion(), readStats()])
+  const [releases, live, stats, feedback] = await Promise.all([listReleases(), liveVersion(), readStats(), readFeedback()])
   const summary = summarize(stats, 30)
   const week = summarize(stats, 7)
   const binaries = Object.fromEntries(
@@ -253,6 +255,16 @@ export default async function AdminPage({
           <StatTable title="Top countries" label="Country" rows={summary.topCountries} />
           <StatTable title="Top pages" label="Path" rows={summary.topPages} />
           <StatTable title="Top referrers" label="Site" rows={summary.topReferrers} />
+        </div>
+      </section>
+
+      <section className="mt-12">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+          <h2 className="font-display text-xl font-medium">Feedback &amp; testimonials</h2>
+          <span className="font-mono text-xs text-faint">{feedback.length} total · from the desktop app</span>
+        </div>
+        <div className="mt-4">
+          <FeedbackPanel entries={feedback} />
         </div>
       </section>
     </main>
