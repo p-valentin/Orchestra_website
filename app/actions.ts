@@ -76,7 +76,7 @@ export async function submitContact(
 export async function claimBeta(_prev: BetaState, formData: FormData): Promise<BetaState> {
   const honeypot = formData.get('company')
   if (typeof honeypot === 'string' && honeypot.trim() !== '') {
-    return { ok: true, message: "You're in — we'll email your license at 1.0." }
+    return { ok: true, message: "You're in — we'll email your free license shortly." }
   }
 
   const limit = rateLimit('beta:' + (await requestIp()))
@@ -104,5 +104,5 @@ export async function claimBeta(_prev: BetaState, formData: FormData): Promise<B
 
   revalidatePath('/')
   revalidatePath('/downloads')
-  return { ok: true, message: "You're in — we'll email your free license when 1.0 ships." }
+  return { ok: true, message: "You're in — we'll email your free license shortly." }
 }

@@ -61,14 +61,14 @@ export default async function DownloadsPage() {
       <Nav />
       <main className="hero-light mx-auto w-full max-w-5xl flex-1 px-5 pb-32 pt-40 sm:px-8">
         <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-brass">
-          v{version} · free beta
+          v{version} · free to use
         </p>
 
         <h1 className="font-display text-5xl font-medium leading-[1.0] tracking-tight sm:text-6xl">
           Download Orchestra.
         </h1>
         <p className="mt-5 max-w-lg text-muted">
-          No account, no card. Claim your beta license below and it stays free for you when paid
+          No account, no card. Claim your free license below and it stays free for you when paid
           plans arrive.
         </p>
 

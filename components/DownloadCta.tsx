@@ -11,11 +11,11 @@ export default async function DownloadCta() {
         <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
           <div>
             <h2 className="font-display text-4xl font-medium leading-[1.05] tracking-tight sm:text-5xl">
-              Free while in beta.
+              Free for early adopters.
               <span className="block text-brass">Free for you, forever.</span>
             </h2>
             <p className="mt-5 max-w-md leading-relaxed text-muted">
-              Download Orchestra, claim your beta license with just an email, and it stays free for
+              Download Orchestra, claim your free license with just an email, and it stays free for
               you when paid plans arrive. No card, no account.
             </p>
 

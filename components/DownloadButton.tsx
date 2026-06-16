@@ -17,7 +17,7 @@ type Props = {
 const NOTICES: Record<'mac' | 'win', { intro: string; steps: string[]; note: string }> = {
   mac: {
     intro:
-      'Orchestra is free during the beta and not yet signed with an Apple certificate, so macOS will warn you the first time you open it. Getting past that takes one extra step:',
+      'Orchestra is not yet signed with an Apple certificate, so macOS will warn you the first time you open it. Getting past that takes one extra step:',
     steps: [
       'Open the .dmg and drag Orchestra into Applications.',
       'Right-click Orchestra.app and choose Open, then confirm with Open.',
@@ -27,7 +27,7 @@ const NOTICES: Record<'mac' | 'win', { intro: string; steps: string[]; note: str
   },
   win: {
     intro:
-      'Orchestra is free during the beta and not yet code-signed, so Windows SmartScreen will show “Windows protected your PC” when you run the installer. To continue:',
+      'Orchestra is not yet code-signed, so Windows SmartScreen will show “Windows protected your PC” when you run the installer. To continue:',
     steps: [
       'Run the downloaded .exe.',
       'When the SmartScreen dialog appears, click “More info”.',
