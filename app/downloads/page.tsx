@@ -1,8 +1,10 @@
 import { liveVersion } from '@/lib/releases'
+import { getLicenseStatus } from '@/lib/licenses'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import BetaSignup from '@/components/BetaSignup'
 import DownloadButton from '@/components/DownloadButton'
+import LicenseCounter from '@/components/LicenseCounter'
 
 type PlatformCardProps = {
   icon: React.ReactNode
@@ -53,7 +55,7 @@ function LinuxIcon() {
 export const dynamic = 'force-dynamic'
 
 export default async function DownloadsPage() {
-  const version = await liveVersion()
+  const [version, license] = await Promise.all([liveVersion(), getLicenseStatus()])
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
@@ -92,7 +94,10 @@ export default async function DownloadsPage() {
         </div>
 
         <div className="mt-12 max-w-lg">
-          <BetaSignup />
+          <div className="mb-3">
+            <LicenseCounter remaining={license.remaining} total={license.total} />
+          </div>
+          <BetaSignup remaining={license.remaining} />
         </div>
       </main>
       <Footer />

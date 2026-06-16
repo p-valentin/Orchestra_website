@@ -1,7 +1,10 @@
+import { getLicenseStatus } from '@/lib/licenses'
 import BetaSignup from './BetaSignup'
 import DownloadButton from './DownloadButton'
+import LicenseCounter from './LicenseCounter'
 
-export default function DownloadCta() {
+export default async function DownloadCta() {
+  const { total, remaining } = await getLicenseStatus()
   return (
     <section id="download" className="border-t border-line bg-panel/40">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
@@ -22,7 +25,11 @@ export default function DownloadCta() {
               <DownloadButton platform="linux" arch="x64" label="Linux" />
             </div>
 
-            <BetaSignup />
+            <div className="mt-6">
+              <LicenseCounter remaining={remaining} total={total} />
+            </div>
+
+            <BetaSignup remaining={remaining} />
           </div>
 
           <div className="rounded-xl border border-line bg-panel p-8 sm:p-10">

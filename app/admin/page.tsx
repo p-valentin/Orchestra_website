@@ -4,6 +4,7 @@ import ReleaseNotes from '@/components/ReleaseNotes'
 import { filesFor, type Platform } from '@/lib/release'
 import { listReleases, liveVersion, type Release } from '@/lib/releases'
 import { readStats, summarize, type StatsSummary } from '@/lib/stats'
+import { getLicenseStatus } from '@/lib/licenses'
 import { storageMode } from '@/lib/store'
 import { readFeedback } from '@/lib/feedback'
 import FeedbackPanel from '@/components/FeedbackPanel'
@@ -150,7 +151,13 @@ export default async function AdminPage({
   searchParams: Promise<{ error?: string }>
 }) {
   const { error } = await searchParams
-  const [releases, live, stats, feedback] = await Promise.all([listReleases(), liveVersion(), readStats(), readFeedback()])
+  const [releases, live, stats, feedback, license] = await Promise.all([
+    listReleases(),
+    liveVersion(),
+    readStats(),
+    readFeedback(),
+    getLicenseStatus(),
+  ])
   const summary = summarize(stats, 30)
   const week = summarize(stats, 7)
   const binaries = Object.fromEntries(
@@ -232,8 +239,9 @@ export default async function AdminPage({
           <span className="font-mono text-xs text-faint">cookieless · aggregate only · no visitor IDs</span>
         </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-4">
+        <div className="mt-4 grid gap-4 sm:grid-cols-5">
           {[
+            ['Licenses remaining', `${license.remaining} / ${license.total}`],
             ['Views · 30d', summary.totalViews],
             ['Downloads · 30d', summary.totalDownloads],
             ['Views · 7d', week.totalViews],

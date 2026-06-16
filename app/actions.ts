@@ -1,8 +1,10 @@
 'use server'
 
 import { headers } from 'next/headers'
+import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rateLimit'
 import { sanitizeText, isValidEmail } from '@/lib/sanitize'
+import { recordClaim } from '@/lib/claim'
 import type { ContactState } from '@/lib/contact'
 import type { BetaState } from '@/lib/beta'
 
@@ -92,6 +94,15 @@ export async function claimBeta(_prev: BetaState, formData: FormData): Promise<B
     return { ok: false, message: '', error: "That email address doesn't look right." }
   }
 
-  await sendEmail('New beta claim', `${email} just claimed a free beta license.`)
+  const result = await recordClaim(email, 'website')
+  if (!result.ok) {
+    if (result.reason === 'closed') {
+      return { ok: false, message: '', error: 'License claims are now closed.' }
+    }
+    return { ok: false, message: '', error: 'Something went wrong on our end — please try again in a moment.' }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/downloads')
   return { ok: true, message: "You're in — we'll email your free license when 1.0 ships." }
 }
