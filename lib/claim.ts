@@ -1,25 +1,44 @@
-import { sendEmail } from './email'
+import { sendEmail, sendLicenseEmail } from './email'
 import { decrementLicense, getLicenseStatus } from './licenses'
+import { upsertClaim } from './claims'
+import { signLicense } from './token'
+import { rateLimit } from './rateLimit'
 
 export type ClaimResult =
-  | { ok: true }
-  | { ok: false; reason: 'closed' | 'email-failed' }
+  | { ok: true; token: string; emailed: boolean }
+  | { ok: false; reason: 'closed' | 'not-configured' }
 
-// Records a free-license claim from either the website form or the desktop app.
-// The counter only decrements when the notification email is actually accepted
-// by Resend — so the remaining count tracks claims that genuinely reached the
-// inbox, and a mail outage can't silently drain the pool.
+// Records a free-license claim from the website form or the desktop app, mints
+// the signed token, and emails it to the claimer. Idempotent via upsertClaim, so
+// re-claiming returns the same token without double-counting. The token is always
+// returned on success (the app stores it directly); `emailed` reports whether the
+// delivery email went out — the website path treats false as a failure since
+// email is its only channel.
 export async function recordClaim(email: string, source: string): Promise<ClaimResult> {
-  const { remaining } = await getLicenseStatus()
-  if (remaining <= 0) return { ok: false, reason: 'closed' }
+  const status = await getLicenseStatus()
+  if (status.closed) return { ok: false, reason: 'closed' }
 
-  const sent = await sendEmail(
-    'New license claim',
-    `${email} just claimed a free license.\n\nSource: ${source}`,
-    email,
-  )
-  if (!sent) return { ok: false, reason: 'email-failed' }
+  const { record, created } = await upsertClaim(email, 'lifetime', source)
+  const token = signLicense({ email: record.email, plan: record.plan, issuedAt: record.issuedAt })
+  if (!token) return { ok: false, reason: 'not-configured' }
 
-  await decrementLicense()
-  return { ok: true }
+  // Repeat claims are legitimate (lost key → re-claim = resend), but bound the
+  // delivery per address: the IP rate limit is per-instance on serverless, so on
+  // its own the endpoint could be scripted to bomb a victim's inbox.
+  const emailAllowed = rateLimit('claim-email:' + email.toLowerCase()).allowed
+  const emailed = emailAllowed && (await sendLicenseEmail(email, token))
+  // Owner notification is best-effort, never gates the claim, and only fires
+  // for genuinely new claims — repeats used to spam the owner too.
+  if (created) {
+    await sendEmail(
+      'New license claim',
+      `${email} just claimed a ${record.plan} license.\n\nSource: ${source}`,
+      email,
+    )
+  }
+
+  // Counter is display-only now (authoritative record is per-email); only move it
+  // on a genuinely new claim so repeats don't drain the pool.
+  if (created) await decrementLicense()
+  return { ok: true, token, emailed }
 }

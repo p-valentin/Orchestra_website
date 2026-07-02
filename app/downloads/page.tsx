@@ -95,9 +95,9 @@ export default async function DownloadsPage() {
 
         <div className="mt-12 max-w-lg">
           <div className="mb-3">
-            <LicenseCounter remaining={license.remaining} total={license.total} />
+            <LicenseCounter remaining={license.remaining} total={license.total} cutoff={license.cutoff} closed={license.closed} />
           </div>
-          <BetaSignup remaining={license.remaining} />
+          <BetaSignup remaining={license.remaining} closed={license.closed} />
         </div>
       </main>
       <Footer />

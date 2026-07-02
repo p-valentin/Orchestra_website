@@ -18,7 +18,7 @@ function SubmitButton() {
   )
 }
 
-export default function BetaSignup({ remaining }: { remaining: number }) {
+export default function BetaSignup({ remaining, closed }: { remaining: number; closed?: boolean }) {
   const [state, formAction] = useActionState(claimBeta, initialBetaState)
 
   if (state.ok) {
@@ -29,7 +29,7 @@ export default function BetaSignup({ remaining }: { remaining: number }) {
     )
   }
 
-  if (remaining <= 0) {
+  if (closed ?? remaining <= 0) {
     return (
       <p className="mt-6 rounded-lg border border-line-strong bg-well px-4 py-3 text-sm text-faint">
         License claims are now closed — thanks for the interest!

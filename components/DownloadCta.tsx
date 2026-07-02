@@ -4,7 +4,7 @@ import DownloadButton from './DownloadButton'
 import LicenseCounter from './LicenseCounter'
 
 export default async function DownloadCta() {
-  const { total, remaining } = await getLicenseStatus()
+  const { total, remaining, cutoff, closed } = await getLicenseStatus()
   return (
     <section id="download" className="border-t border-line bg-panel/40">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
@@ -16,7 +16,7 @@ export default async function DownloadCta() {
             </h2>
             <p className="mt-5 max-w-md leading-relaxed text-muted">
               Download Orchestra, claim your free license with just an email, and it stays free for
-              you when paid plans arrive. No card, no account.
+              you forever — even after it becomes a $149 lifetime purchase. No card, no account.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -26,10 +26,10 @@ export default async function DownloadCta() {
             </div>
 
             <div className="mt-6">
-              <LicenseCounter remaining={remaining} total={total} />
+              <LicenseCounter remaining={remaining} total={total} cutoff={cutoff} closed={closed} />
             </div>
 
-            <BetaSignup remaining={remaining} />
+            <BetaSignup remaining={remaining} closed={closed} />
           </div>
 
           <div className="rounded-xl border border-line bg-panel p-8 sm:p-10">

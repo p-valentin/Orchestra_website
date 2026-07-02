@@ -40,5 +40,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ ok: false, error: result.reason }, { status })
   }
 
-  return Response.json({ ok: true })
+  // The app stores this token directly; the delivery email is a backup, so we
+  // don't fail the call when email is down.
+  return Response.json({ ok: true, token: result.token })
 }

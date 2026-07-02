@@ -241,10 +241,10 @@ export default async function AdminPage({
 
         <div className="mt-4 grid gap-4 sm:grid-cols-5">
           {[
-            ['Licenses remaining', `${license.remaining} / ${license.total}`],
+            ['Licenses claimed', `${license.claimed} / ${license.total}`],
+            ['Window', license.closed ? 'closed' : license.cutoff ? new Date(license.cutoff).toLocaleDateString() : 'open'],
             ['Views · 30d', summary.totalViews],
             ['Downloads · 30d', summary.totalDownloads],
-            ['Views · 7d', week.totalViews],
             ['Downloads · 7d', week.totalDownloads],
           ].map(([label, value]) => (
             <div key={label} className={card}>
