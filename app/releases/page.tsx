@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Release notes — Orchestra',
   description: 'What changed in each Orchestra release.',
+  alternates: { canonical: '/releases' },
 }
 
 function formatDate(iso: string): string {

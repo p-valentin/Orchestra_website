@@ -1,6 +1,6 @@
 const CASES = [
   {
-    title: 'Scraping & data extraction',
+    title: 'Web scraping & data extraction',
     body: 'Pull products, listings, articles or tables into clean JSON / CSV — with loops, pagination and stealth built in.',
     tools: 'Extract List · Each · Output',
   },

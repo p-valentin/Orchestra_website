@@ -28,31 +28,44 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://orchestra-automation.com'),
-  title: 'Orchestra — Automate any website. Keep the code.',
+  title: {
+    default: 'Orchestra — Browser Automation & Web Scraping Studio',
+    template: '%s',
+  },
   description:
-    'Orchestra is a desktop studio for browser automation. Build flows visually, watch them run live, and export plain Playwright you own forever. No account, no cloud, no lock-in.',
+    'Orchestra is a desktop studio for browser automation, web scraping and web RPA. Build flows visually, watch them run live, and export plain Playwright you own forever. No account, no cloud, no lock-in.',
   applicationName: 'Orchestra',
+  alternates: { canonical: '/' },
   keywords: [
     'browser automation',
-    'visual automation',
-    'playwright',
-    'no-code',
+    'web automation',
     'web scraping',
-    'desktop app',
+    'web scraping tool',
+    'web RPA',
+    'browser RPA',
+    'RPA software',
+    'no-code web scraping',
+    'visual automation',
+    'automate website tasks',
+    'playwright',
+    'playwright codegen alternative',
+    'no-code automation',
+    'desktop automation app',
     'automation tool',
   ],
   openGraph: {
-    title: 'Orchestra — Automate any website. Keep the code.',
+    title: 'Orchestra — Browser Automation & Web Scraping Studio',
     description:
-      'Build browser automations visually, watch them run live, export plain Playwright you own forever.',
+      'Build browser automations and web scrapers visually, watch them run live, export plain Playwright you own forever.',
     type: 'website',
     siteName: 'Orchestra',
+    url: 'https://orchestra-automation.com',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Orchestra — Automate any website. Keep the code.',
+    title: 'Orchestra — Browser Automation & Web Scraping Studio',
     description:
-      'Build browser automations visually, watch them run live, export plain Playwright you own forever.',
+      'Build browser automations and web scrapers visually, watch them run live, export plain Playwright you own forever.',
   },
   robots: { index: true, follow: true },
 }

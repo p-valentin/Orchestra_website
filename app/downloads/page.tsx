@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { liveVersion } from '@/lib/releases'
 import { getLicenseStatus } from '@/lib/licenses'
 import Nav from '@/components/Nav'
@@ -53,6 +54,13 @@ function LinuxIcon() {
 }
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Download Orchestra — Browser Automation for Mac, Windows & Linux',
+  description:
+    'Download Orchestra, the desktop studio for browser automation and web scraping. Free to use — build flows visually and export plain Playwright code.',
+  alternates: { canonical: '/downloads' },
+}
 
 export default async function DownloadsPage() {
   const [version, license] = await Promise.all([liveVersion(), getLicenseStatus()])
