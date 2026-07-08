@@ -2,7 +2,10 @@
 // admin password, so rotating the password invalidates every session. Uses
 // Web Crypto only — this file must stay importable from edge middleware.
 
-export const SESSION_COOKIE = 'orchestra_admin'
+// __Secure- prefix makes the browser refuse the cookie unless it's set with
+// Secure over HTTPS — production only, since local dev runs plain HTTP.
+export const SESSION_COOKIE =
+  process.env.NODE_ENV === 'production' ? '__Secure-orchestra_admin' : 'orchestra_admin'
 export const SESSION_HOURS = 24 * 7
 
 function constantTimeEqual(a: string, b: string): boolean {
