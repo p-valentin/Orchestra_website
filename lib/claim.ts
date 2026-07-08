@@ -1,5 +1,5 @@
 import { sendEmail, sendLicenseEmail } from './email'
-import { decrementLicense, getLicenseStatus } from './licenses'
+import { getLicenseStatus } from './licenses'
 import { upsertClaim } from './claims'
 import { signLicense } from './token'
 import { rateLimit } from './rateLimit'
@@ -28,7 +28,8 @@ export async function recordClaim(email: string, source: string): Promise<ClaimR
   const emailAllowed = rateLimit('claim-email:' + email.toLowerCase()).allowed
   const emailed = emailAllowed && (await sendLicenseEmail(email, token))
   // Owner notification is best-effort, never gates the claim, and only fires
-  // for genuinely new claims — repeats used to spam the owner too.
+  // for genuinely new claims — repeats used to spam the owner too. The public
+  // count is derived from the per-email records, so nothing else to update.
   if (created) {
     await sendEmail(
       'New license claim',
@@ -36,9 +37,5 @@ export async function recordClaim(email: string, source: string): Promise<ClaimR
       email,
     )
   }
-
-  // Counter is display-only now (authoritative record is per-email); only move it
-  // on a genuinely new claim so repeats don't drain the pool.
-  if (created) await decrementLicense()
   return { ok: true, token, emailed }
 }
