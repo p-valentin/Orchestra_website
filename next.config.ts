@@ -5,7 +5,9 @@ const ContentSecurityPolicy = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
   "font-src 'self' fonts.gstatic.com",
-  "img-src 'self' data:",
+  // downloads host allowed so blog posts can embed images/GIFs hosted on the
+  // public R2 bucket alongside the app binaries
+  "img-src 'self' data: https://downloads.orchestra-automation.com",
   "connect-src 'self'",
 ].join('; ')
 
