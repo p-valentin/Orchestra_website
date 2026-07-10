@@ -7,6 +7,7 @@ const LINKS = [
   { href: '/#how', label: 'How it works' },
   { href: '/#features', label: 'Features' },
   { href: '/#uses', label: 'Use cases' },
+  { href: '/docs', label: 'Docs' },
   { href: '/blog', label: 'Blog' },
   { href: '/releases', label: 'Releases' },
   { href: '/#contact', label: 'Contact' },
@@ -46,7 +47,7 @@ export default function Nav() {
           <span className="font-display text-xl font-semibold tracking-tight">Orchestra</span>
         </a>
 
-        <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
+        <nav className="hidden items-center gap-5 lg:flex xl:gap-8" aria-label="Primary">
           {LINKS.map((link) => (
             <a
               key={link.label}
@@ -60,13 +61,13 @@ export default function Nav() {
 
         <a
           href="/downloads"
-          className="hidden rounded-lg bg-brass px-5 py-2 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright md:inline-block"
+          className="hidden rounded-lg bg-brass px-5 py-2 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright lg:inline-block"
         >
           Download free
         </a>
 
         <button
-          className="flex h-10 w-10 items-center justify-center md:hidden"
+          className="flex h-10 w-10 items-center justify-center lg:hidden"
           aria-label={open ? 'Close menu' : 'Open menu'}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -80,7 +81,7 @@ export default function Nav() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 top-[61px] z-40 flex flex-col gap-1 bg-bg px-6 py-8 md:hidden">
+        <div className="fixed inset-0 top-[61px] z-40 flex flex-col gap-1 bg-bg px-6 py-8 lg:hidden">
           {LINKS.map((link) => (
             <a
               key={link.label}

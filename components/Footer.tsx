@@ -18,6 +18,7 @@ export default function Footer() {
           <a href="/#how" className="text-sm text-muted transition-colors hover:text-fg">How it works</a>
           <a href="/#features" className="text-sm text-muted transition-colors hover:text-fg">Features</a>
           <a href="/downloads" className="text-sm text-muted transition-colors hover:text-fg">Download</a>
+          <a href="/docs" className="text-sm text-muted transition-colors hover:text-fg">Docs</a>
           <a href="/blog" className="text-sm text-muted transition-colors hover:text-fg">Blog</a>
           <a href="/releases" className="text-sm text-muted transition-colors hover:text-fg">Releases</a>
           <a href="/#contact" className="text-sm text-muted transition-colors hover:text-fg">Contact</a>

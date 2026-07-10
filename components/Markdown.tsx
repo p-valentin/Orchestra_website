@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm'
 // variant for changelogs; this one keeps a real heading hierarchy (the page
 // supplies the h1, so markdown # / ## both render as h2).
 
-const components: Components = {
+export const markdownComponents: Components = {
   h1: ({ children }) => <h2 className="pt-4 font-display text-2xl font-medium tracking-tight text-fg sm:text-3xl">{children}</h2>,
   h2: ({ children }) => <h2 className="pt-4 font-display text-2xl font-medium tracking-tight text-fg sm:text-3xl">{children}</h2>,
   h3: ({ children }) => <h3 className="pt-2 font-display text-xl font-medium text-fg">{children}</h3>,
@@ -53,7 +53,7 @@ const components: Components = {
 export default function Markdown({ text }: { text: string }) {
   return (
     <div className="flex flex-col gap-4">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownComponents}>
         {text}
       </ReactMarkdown>
     </div>
