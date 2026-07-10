@@ -1,7 +1,7 @@
 import { sendEmail, sendLicenseEmail } from './email'
 import { getLicenseStatus } from './licenses'
 import { upsertClaim } from './claims'
-import { signLicense } from './token'
+import { licenseConfigured, signLicense } from './token'
 import { rateLimit } from './rateLimit'
 
 export type ClaimResult =
@@ -15,6 +15,11 @@ export type ClaimResult =
 // delivery email went out — the website path treats false as a failure since
 // email is its only channel.
 export async function recordClaim(email: string, source: string): Promise<ClaimResult> {
+  // Checked before any writes: without a signing key the claim can never be
+  // fulfilled, and recording it anyway would consume a license slot for
+  // someone who only ever saw an error.
+  if (!licenseConfigured()) return { ok: false, reason: 'not-configured' }
+
   const status = await getLicenseStatus()
   if (status.closed) return { ok: false, reason: 'closed' }
 

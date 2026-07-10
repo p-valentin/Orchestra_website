@@ -30,6 +30,14 @@ function privateKey(): crypto.KeyObject | null {
   }
 }
 
+// True when a signing key is present and parseable. Claim flows must check
+// this BEFORE any side effects: a misconfigured deploy has to fail closed,
+// not record claims it can never fulfil (production did exactly that while
+// LICENSE_PRIVATE_KEY was missing from Vercel).
+export function licenseConfigured(): boolean {
+  return privateKey() !== null
+}
+
 // Compact token: base64url(payloadJson).base64url(ed25519 sig over that body).
 // Ed25519 is deterministic (RFC 8032), so re-signing an identical payload yields
 // the same token — a reinstall recovers the exact key from the stored claim.

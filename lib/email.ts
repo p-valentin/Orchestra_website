@@ -33,7 +33,17 @@ export async function sendEmail(subject: string, text: string, replyTo?: string)
 // error (email is the only delivery channel for web claimers).
 export async function sendLicenseEmail(to: string, token: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) return false
+  if (!apiKey) {
+    // Local dev has no delivery channel, so print the license instead of
+    // failing — otherwise the website claim flow can never succeed locally.
+    // Production without a key still returns false: there, non-delivery is a
+    // real error the form must surface.
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[email:dev] license for ${to} (not sent, RESEND_API_KEY unset):\n${token}`)
+      return true
+    }
+    return false
+  }
   const from = process.env.RESEND_FROM ?? 'Orchestra <onboarding@resend.dev>'
   const activateUrl = `orchestra://activate?token=${encodeURIComponent(token)}`
   const text = [
