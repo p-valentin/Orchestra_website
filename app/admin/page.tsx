@@ -11,9 +11,12 @@ import { readFeedback } from '@/lib/feedback'
 import FeedbackPanel from '@/components/FeedbackPanel'
 import { listGrants } from '@/lib/licenseGrants'
 import { listClaims } from '@/lib/claims'
+import { signLicense } from '@/lib/token'
+import CopyButton from '@/components/CopyButton'
 import { listAudit } from '@/lib/audit'
 import { listPosts, type BlogPost } from '@/lib/blog'
 import {
+  deleteClaimAction,
   deletePostAction,
   deleteReleaseAction,
   grantLicenseAction,
@@ -537,13 +540,24 @@ export default async function AdminPage({
             <p className="mt-4 text-sm text-faint">No recorded claims yet.</p>
           ) : (
             <div className="mt-4">
-              {claims.map(c => (
-                <div key={c.email} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5">
-                  <span className="break-all font-mono text-sm text-muted">{c.email}</span>
-                  <span className="rounded-full bg-well px-2.5 py-0.5 font-mono text-[11px] text-faint">{c.source}</span>
-                  <span className="ml-auto font-mono text-xs text-faint">{formatDay(c.issuedAt)}</span>
-                </div>
-              ))}
+              {claims.map(c => {
+                // Tokens are deterministic (same payload ⇒ same signature), so
+                // the key shown here is exactly what the claimer would have —
+                // copy it into a personal email to deliver their license.
+                const token = signLicense({ email: c.email, plan: c.plan, issuedAt: c.issuedAt })
+                return (
+                  <div key={c.email} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5">
+                    <span className="break-all font-mono text-sm text-muted">{c.email}</span>
+                    <span className="rounded-full bg-well px-2.5 py-0.5 font-mono text-[11px] text-faint">{c.source}</span>
+                    {token && <CopyButton text={token} label="copy key" />}
+                    <span className="ml-auto font-mono text-xs text-faint">{formatDay(c.issuedAt)}</span>
+                    <form action={deleteClaimAction}>
+                      <input type="hidden" name="email" value={c.email} />
+                      <button className="font-mono text-xs text-faint hover:text-[#f0a8a2]">remove</button>
+                    </form>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

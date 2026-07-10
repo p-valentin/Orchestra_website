@@ -5,10 +5,10 @@ import { recordClaim } from '@/lib/claim'
 
 // JSON endpoint for the desktop app's "claim free license" flow. The caller is
 // the Electron main process (Node), not a browser, so no CORS handling is
-// needed. Mirrors /api/feedback. Each accepted claim decrements the shared
-// license counter — but only once the notification email is sent (see
-// lib/claim.ts), which also keeps the public endpoint from being scripted to
-// drain the pool without a real email going out.
+// needed. Mirrors /api/feedback. Each accepted claim writes a per-email record
+// (the public count is derived from those) and notifies the owner, who sends
+// keys personally — except here, where the token is returned for instant
+// in-app activation.
 
 function requestIp(req: NextRequest): string {
   const fwd = req.headers.get('x-forwarded-for')
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ ok: false, error: result.reason }, { status })
   }
 
-  // The app stores this token directly; the delivery email is a backup, so we
-  // don't fail the call when email is down.
+  // The app stores this token directly, so app claims activate without
+  // waiting on the owner.
   return Response.json({ ok: true, token: result.token })
 }

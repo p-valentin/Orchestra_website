@@ -76,7 +76,7 @@ export async function submitContact(
 export async function claimBeta(_prev: BetaState, formData: FormData): Promise<BetaState> {
   const honeypot = formData.get('company')
   if (typeof honeypot === 'string' && honeypot.trim() !== '') {
-    return { ok: true, message: "You're locked in — Orchestra stays free forever for you. We'll email your license when it's ready." }
+    return { ok: true, message: "You're locked in — Orchestra is free forever for you. Your license key will arrive by email soon." }
   }
 
   const limit = rateLimit('beta:' + (await requestIp()))
@@ -102,13 +102,9 @@ export async function claimBeta(_prev: BetaState, formData: FormData): Promise<B
     return { ok: false, message: '', error: 'Something went wrong on our end — please try again in a moment.' }
   }
 
-  // Website claimers only get the key by email — if delivery failed there's no
-  // other channel, so surface it rather than claiming success.
-  if (!result.emailed) {
-    return { ok: false, message: '', error: "We couldn't email your license just now — please try again in a moment." }
-  }
-
   revalidatePath('/')
   revalidatePath('/downloads')
-  return { ok: true, message: "You're locked in — Orchestra is free forever for you. Check your email for your license key." }
+  // The key is sent personally by the owner (recordClaim notified them), so
+  // the message promises delivery without pointing at an inbox just yet.
+  return { ok: true, message: "You're locked in — Orchestra is free forever for you. Your license key will arrive by email soon." }
 }

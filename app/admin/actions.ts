@@ -8,6 +8,7 @@ import { deleteRelease, saveRelease, setPublished } from '@/lib/releases'
 import { deleteFeedback } from '@/lib/feedback'
 import { grantLicense, revokeLicense } from '@/lib/licenseGrants'
 import { setLegacyClaims, TOTAL_LICENSES } from '@/lib/licenses'
+import { deleteClaim } from '@/lib/claims'
 import { deletePost, savePost, setPostPublished, slugify, SLUG_RE } from '@/lib/blog'
 import { recordAudit } from '@/lib/audit'
 import { isValidEmail, sanitizeText } from '@/lib/sanitize'
@@ -101,6 +102,17 @@ export async function revokeLicenseAction(formData: FormData): Promise<void> {
 
 // Reconcile control for claims that predate per-email records (before Jul
 // 2026): the derived public count is records + this offset.
+export async function deleteClaimAction(formData: FormData): Promise<void> {
+  await requireAdmin()
+  const email = sanitizeText(formData.get('email'), 254)
+  if (!isValidEmail(email)) return
+  await deleteClaim(email)
+  await recordAudit('claim-deleted', email)
+  revalidatePath('/admin')
+  revalidatePath('/')
+  revalidatePath('/downloads')
+}
+
 export async function setLegacyClaimsAction(formData: FormData): Promise<void> {
   await requireAdmin()
   const count = Number(formData.get('count'))

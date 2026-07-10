@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { listKeys, readJson, writeJson } from './store'
+import { deleteKey, listKeys, readJson, writeJson } from './store'
 
 // One record per claimer, keyed by a hash of the email, so writes never collide
 // (unlike the shared counter in licenses.ts). This is the authoritative record
@@ -56,6 +56,15 @@ export async function listClaims(): Promise<ClaimRecord[]> {
 
 export async function getClaim(email: string): Promise<ClaimRecord | null> {
   return readJson<ClaimRecord | null>(keyFor(email), null)
+}
+
+// Removes a claim record and its index entry (test/junk sign-ups). The public
+// count is derived, never stored, so it drops as soon as the record is gone.
+export async function deleteClaim(email: string): Promise<void> {
+  const normalized = email.toLowerCase().trim()
+  await deleteKey(keyFor(email))
+  const index = await readJson<string[]>(INDEX_KEY, [])
+  if (index.includes(normalized)) await writeJson(INDEX_KEY, index.filter(e => e !== normalized))
 }
 
 // Idempotent: an existing claim is returned unchanged (same issuedAt ⇒ same

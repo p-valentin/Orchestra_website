@@ -105,3 +105,24 @@ export async function writeJson(key: string, data: unknown): Promise<boolean> {
     return false
   }
 }
+
+// Deleting an already-absent key succeeds — callers only care that it's gone.
+export async function deleteKey(key: string): Promise<boolean> {
+  const r2 = r2Config()
+  if (r2) {
+    try {
+      const res = await r2.client.fetch(`${r2.url}/${key}`, { method: 'DELETE' })
+      if (!res.ok && res.status !== 404) throw new Error(`R2 delete ${key}: ${res.status}`)
+      return true
+    } catch (err) {
+      console.error('[store] delete failed:', (err as Error).message)
+      return false
+    }
+  }
+  try {
+    fs.unlinkSync(path.join(LOCAL_DIR, key))
+    return true
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'ENOENT'
+  }
+}

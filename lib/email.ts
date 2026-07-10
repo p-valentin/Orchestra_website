@@ -6,7 +6,15 @@
 export async function sendEmail(subject: string, text: string, replyTo?: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
   const to = process.env.CONTACT_EMAIL
-  if (!apiKey || !to) return false
+  if (!apiKey || !to) {
+    // Same dev fallback as sendLicenseEmail below: log instead of failing so
+    // owner notifications are visible when testing locally.
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[email:dev] to owner — ${subject}\n${text}`)
+      return true
+    }
+    return false
+  }
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
