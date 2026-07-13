@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { deleteKey, listKeys, readJson, writeJson } from './store'
+import { deleteKey, listKeys, readJson, readJsonChecked, writeJson } from './store'
 
 // One record per claimer, keyed by a hash of the email, so writes never collide
 // (unlike the shared counter in licenses.ts). This is the authoritative record
@@ -29,7 +29,11 @@ function keyFor(email: string): string {
 
 async function updateIndex(email: string): Promise<void> {
   const normalized = email.toLowerCase().trim()
-  const index = await readJson<string[]>(INDEX_KEY, [])
+  // A failed read skips the update rather than rebuilding the index around one
+  // email; the claim record itself is already written, and the index self-heals
+  // on the next claim or re-claim once reads recover.
+  const index = await readJsonChecked<string[]>(INDEX_KEY, [])
+  if (!index) return
   if (!index.includes(normalized)) await writeJson(INDEX_KEY, [...index, normalized])
 }
 
@@ -63,7 +67,8 @@ export async function getClaim(email: string): Promise<ClaimRecord | null> {
 export async function deleteClaim(email: string): Promise<void> {
   const normalized = email.toLowerCase().trim()
   await deleteKey(keyFor(email))
-  const index = await readJson<string[]>(INDEX_KEY, [])
+  const index = await readJsonChecked<string[]>(INDEX_KEY, [])
+  if (!index) return
   if (index.includes(normalized)) await writeJson(INDEX_KEY, index.filter(e => e !== normalized))
 }
 

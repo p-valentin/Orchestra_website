@@ -51,6 +51,15 @@ export default async function BlogPage() {
                     {post.title}
                   </h2>
                   {post.description && <p className="mt-2 text-muted">{post.description}</p>}
+                  {(post.tags?.length ?? 0) > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {post.tags!.map(tag => (
+                        <span key={tag} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-[11px] text-faint">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <p className="mt-4 font-mono text-xs text-brass">Read →</p>
                 </article>
               </a>

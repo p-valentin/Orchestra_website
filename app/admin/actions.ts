@@ -9,7 +9,7 @@ import { deleteFeedback } from '@/lib/feedback'
 import { grantLicense, revokeLicense } from '@/lib/licenseGrants'
 import { setLegacyClaims, TOTAL_LICENSES } from '@/lib/licenses'
 import { deleteClaim } from '@/lib/claims'
-import { deletePost, savePost, setPostPublished, slugify, SLUG_RE } from '@/lib/blog'
+import { deletePost, parseTags, savePost, setPostPublished, slugify, SLUG_RE } from '@/lib/blog'
 import { recordAudit } from '@/lib/audit'
 import { isValidEmail, sanitizeText } from '@/lib/sanitize'
 
@@ -139,11 +139,12 @@ export async function savePostAction(formData: FormData): Promise<void> {
   const title = sanitizeText(formData.get('title'), 120)
   const description = sanitizeText(formData.get('description'), 200)
   const body = String(formData.get('body') ?? '').trim().slice(0, 50_000)
+  const tags = parseTags(sanitizeText(formData.get('tags'), 400))
   // An existing slug means editing; otherwise it's derived from the title so
   // URLs stay stable across later title tweaks.
   const slug = String(formData.get('slug') ?? '').trim() || slugify(title)
   if (!title || !SLUG_RE.test(slug)) redirect('/admin?error=invalid-post')
-  const ok = await savePost({ slug, title, description, body })
+  const ok = await savePost({ slug, title, description, body, tags })
   if (!ok) redirect('/admin?error=save-failed')
   await recordAudit('post-saved', slug)
   refreshBlog(slug)

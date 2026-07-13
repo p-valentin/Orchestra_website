@@ -1,4 +1,4 @@
-import { readJson, writeJson } from './store'
+import { readJson, readJsonChecked, writeJson } from './store'
 
 // Append-only trail of admin activity (logins + every mutating admin action),
 // shown on the admin page. Best-effort: a failed write never blocks the action
@@ -16,7 +16,10 @@ export interface AuditEntry {
 
 export async function recordAudit(action: string, detail?: string, ip?: string): Promise<void> {
   try {
-    const entries = await readJson<AuditEntry[]>(KEY, [])
+    // Skip the entry when the read fails — losing one entry beats replacing
+    // the whole trail with a single-entry file.
+    const entries = await readJsonChecked<AuditEntry[]>(KEY, [])
+    if (!entries) return
     entries.push({ at: Date.now(), action, ...(detail ? { detail } : {}), ...(ip ? { ip } : {}) })
     await writeJson(KEY, entries.slice(-MAX_ENTRIES))
   } catch (err) {

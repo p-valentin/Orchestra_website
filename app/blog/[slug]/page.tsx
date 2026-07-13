@@ -24,6 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${post.title} — Orchestra`,
     description: post.description || undefined,
+    keywords: post.tags?.length ? post.tags : undefined,
     alternates: { canonical: `/blog/${post.slug}` },
     openGraph: {
       type: 'article',
@@ -31,6 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: post.description || undefined,
       publishedTime: post.publishedAt ?? undefined,
       modifiedTime: post.updatedAt,
+      tags: post.tags?.length ? post.tags : undefined,
     },
   }
 }
@@ -54,6 +56,7 @@ export default async function BlogPostPage({ params }: Props) {
     url: `https://orchestra-automation.com/blog/${post.slug}`,
     author: { '@type': 'Organization', name: 'Orchestra' },
     publisher: { '@type': 'Organization', name: 'Orchestra', url: 'https://orchestra-automation.com' },
+    ...(post.tags?.length ? { keywords: post.tags.join(', ') } : {}),
   }
 
   return (
@@ -72,6 +75,15 @@ export default async function BlogPostPage({ params }: Props) {
             <time className="mt-4 block font-mono text-xs text-faint" dateTime={post.publishedAt}>
               {formatDate(post.publishedAt)}
             </time>
+          )}
+          {(post.tags?.length ?? 0) > 0 && (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {post.tags!.map(tag => (
+                <span key={tag} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-[11px] text-faint">
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
           <div className="mt-10">
             <Markdown text={post.body} />

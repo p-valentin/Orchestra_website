@@ -220,12 +220,16 @@ function PostRow({ post }: { post: BlogPost }) {
         </div>
       </div>
       {post.description && <p className="mt-1 text-sm text-faint">{post.description}</p>}
+      {(post.tags?.length ?? 0) > 0 && (
+        <p className="mt-1 font-mono text-[11px] text-faint">{post.tags!.join(' · ')}</p>
+      )}
       <details className="mt-2">
         <summary className="cursor-pointer font-mono text-xs text-faint hover:text-muted">edit post</summary>
         <form action={savePostAction} className="mt-3 flex flex-col gap-2">
           <input type="hidden" name="slug" value={post.slug} />
           <input name="title" defaultValue={post.title} required maxLength={120} className={`${input} w-full max-w-xl`} />
           <input name="description" defaultValue={post.description} maxLength={200} placeholder="one-line description (meta + list page)" className={`${input} w-full max-w-xl`} />
+          <input name="tags" defaultValue={(post.tags ?? []).join(', ')} maxLength={400} placeholder="tags, comma-separated — shown on the post and fed to SEO keywords" className={`${input} w-full max-w-xl`} />
           <NotesEditor key={post.updatedAt} name="body" rows={14} defaultValue={post.body} />
           <button className={`${btn} self-start border border-brass/50 text-brass-bright hover:bg-brass hover:text-[#1a1306]`}>
             Save post
@@ -426,6 +430,7 @@ export default async function AdminPage({
           <form action={savePostAction} className="mt-3 flex flex-col gap-2">
             <input name="title" placeholder="Post title" required maxLength={120} className={`${input} w-full max-w-xl`} />
             <input name="description" placeholder="one-line description (meta + list page)" maxLength={200} className={`${input} w-full max-w-xl`} />
+            <input name="tags" placeholder="tags, comma-separated — shown on the post and fed to SEO keywords" maxLength={400} className={`${input} w-full max-w-xl`} />
             <NotesEditor
               key={posts.length}
               name="body"

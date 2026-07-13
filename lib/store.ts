@@ -27,22 +27,32 @@ export function storageMode(): 'r2' | 'local' {
 }
 
 export async function readJson<T>(key: string, fallback: T): Promise<T> {
+  return (await readJsonChecked(key, fallback)) ?? fallback
+}
+
+// Like readJson, but only a genuinely missing key yields `missing`; any other
+// failure returns null. Read-modify-write callers must use this: through
+// readJson a transient read error looks like an empty store, and writing the
+// "updated" result back would clobber every record the read never saw.
+export async function readJsonChecked<T>(key: string, missing: T): Promise<T | null> {
   const r2 = r2Config()
   if (r2) {
     try {
       const res = await r2.client.fetch(`${r2.url}/${key}`)
-      if (res.status === 404) return fallback
+      if (res.status === 404) return missing
       if (!res.ok) throw new Error(`R2 read ${key}: ${res.status}`)
       return (await res.json()) as T
     } catch (err) {
       console.error('[store] read failed:', (err as Error).message)
-      return fallback
+      return null
     }
   }
   try {
     return JSON.parse(fs.readFileSync(path.join(LOCAL_DIR, key), 'utf-8')) as T
-  } catch {
-    return fallback
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return missing
+    console.error('[store] read failed:', (err as Error).message)
+    return null
   }
 }
 
