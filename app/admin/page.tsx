@@ -230,7 +230,7 @@ function PostRow({ post }: { post: BlogPost }) {
           <input name="title" defaultValue={post.title} required maxLength={120} className={`${input} w-full max-w-xl`} />
           <input name="description" defaultValue={post.description} maxLength={200} placeholder="one-line description (meta + list page)" className={`${input} w-full max-w-xl`} />
           <input name="tags" defaultValue={(post.tags ?? []).join(', ')} maxLength={400} placeholder="tags, comma-separated — shown on the post and fed to SEO keywords" className={`${input} w-full max-w-xl`} />
-          <NotesEditor key={post.updatedAt} name="body" rows={14} defaultValue={post.body} />
+          <NotesEditor key={post.updatedAt} name="body" rows={14} defaultValue={post.body} preview="article" />
           <button className={`${btn} self-start border border-brass/50 text-brass-bright hover:bg-brass hover:text-[#1a1306]`}>
             Save post
           </button>
@@ -435,6 +435,7 @@ export default async function AdminPage({
               key={posts.length}
               name="body"
               rows={10}
+              preview="article"
               placeholder={'Write in markdown. First save creates a draft; publish when ready.'}
             />
             <button className={`${btn} self-start bg-brass text-[#1a1306] hover:bg-brass-bright`}>Save draft</button>

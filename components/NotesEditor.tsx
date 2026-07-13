@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Markdown from './Markdown'
 import ReleaseNotes from './ReleaseNotes'
 
 export default function NotesEditor({
@@ -8,11 +9,16 @@ export default function NotesEditor({
   defaultValue,
   placeholder,
   rows,
+  preview = 'compact',
 }: {
   name: string
   defaultValue?: string
   placeholder?: string
   rows: number
+  // 'article' previews with the real blog renderer (headings, code
+  // highlighting) so drafts look exactly like the published page;
+  // 'compact' keeps the changelog renderer for release notes.
+  preview?: 'article' | 'compact'
 }) {
   const [text, setText] = useState(defaultValue ?? '')
 
@@ -28,7 +34,7 @@ export default function NotesEditor({
       />
       <div className="rounded-lg border border-line-strong bg-well px-3 py-2 overflow-auto">
         {text.trim() ? (
-          <ReleaseNotes text={text} />
+          preview === 'article' ? <Markdown text={text} /> : <ReleaseNotes text={text} />
         ) : (
           <p className="text-sm text-faint">Preview will appear here.</p>
         )}
