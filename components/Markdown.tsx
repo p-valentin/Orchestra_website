@@ -29,8 +29,17 @@ export const markdownComponents: Components = {
   },
   strong: ({ children }) => <strong className="font-semibold text-fg">{children}</strong>,
   em: ({ children }) => <em className="italic">{children}</em>,
-  code: ({ children }) => <code className="rounded bg-line/60 px-1.5 py-0.5 font-mono text-[14px] text-fg">{children}</code>,
-  pre: ({ children }) => <pre className="overflow-x-auto rounded-lg bg-line/60 p-4 font-mono text-[13px] text-fg">{children}</pre>,
+  // Inline code gets a bordered chip; fenced blocks get a full-width well. The
+  // [&_code] overrides strip the chip styling from the <code> react-markdown
+  // nests inside every <pre>, so blocks don't end up double-boxed.
+  code: ({ children }) => (
+    <code className="rounded border border-line bg-well px-1.5 py-0.5 font-mono text-[13.5px] text-brass-bright">{children}</code>
+  ),
+  pre: ({ children }) => (
+    <pre className="overflow-x-auto rounded-lg border border-line bg-well p-4 font-mono text-[13.5px] leading-relaxed text-fg sm:p-5 [&_code]:border-0 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-fg">
+      {children}
+    </pre>
+  ),
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-brass/50 pl-4 text-[16px] leading-relaxed text-faint">{children}</blockquote>
   ),
