@@ -57,3 +57,55 @@ body {
   border-top-color: #d9b36a;
   animation: spin 0.7s linear infinite;
 }
+
+/* Syntax highlighting (rehype-highlight → highlight.js classes) in blog code
+   blocks. Warm palette tuned to the site theme, on the bg-well block from
+   components/Markdown.tsx. Every color clears WCAG AA against #0f0d0a. */
+.hljs-comment,
+.hljs-quote {
+  color: #8a7f68;
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-tag,
+.hljs-name,
+.hljs-meta {
+  color: #e0917a;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #a9c77f;
+}
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: #d9b36a;
+}
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: #ecd393;
+}
+.hljs-built_in,
+.hljs-type,
+.hljs-class,
+.hljs-template-variable,
+.hljs-variable.language_ {
+  color: #96b9dc;
+}
+.hljs-deletion {
+  color: #f0a8a2;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}

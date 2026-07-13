@@ -1,4 +1,5 @@
 import ReactMarkdown, { type Components } from 'react-markdown'
+import rehypeHighlight from 'rehype-highlight'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 
@@ -62,7 +63,14 @@ export const markdownComponents: Components = {
 export default function Markdown({ text }: { text: string }) {
   return (
     <div className="flex flex-col gap-4">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownComponents}>
+      {/* Highlighting runs server-side (this stays a server component), so
+          readers ship no extra JS. detect:true colors fenced blocks even when
+          the author omits a language tag; token colors live in globals.css. */}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[[rehypeHighlight, { detect: true }]]}
+        components={markdownComponents}
+      >
         {text}
       </ReactMarkdown>
     </div>
