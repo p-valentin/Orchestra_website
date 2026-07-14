@@ -48,6 +48,15 @@ create table public.webhook_events (
   unique (provider, event_id)
 );
 
+-- Data-access grants. Current Supabase defaults grant no DML on new tables,
+-- so spell out exactly who can do what: authenticated gets SELECT only (rows
+-- scoped by the RLS policies below), service_role gets full DML for the Edge
+-- Functions, anon gets nothing. webhook_events is service-role only.
+grant select on public.licenses, public.devices to authenticated;
+grant select, insert, update, delete
+  on public.licenses, public.devices, public.webhook_events to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
 -- RLS: clients may read their own rows; every write path is service-role only
 -- (no INSERT/UPDATE/DELETE policies exist, so RLS denies them for clients).
 alter table public.licenses       enable row level security;
