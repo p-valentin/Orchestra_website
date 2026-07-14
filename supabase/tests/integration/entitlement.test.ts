@@ -39,12 +39,23 @@ async function cleanup(userIds: string[], licenseIds: string[]) {
   for (const id of userIds) await deleteTestUser(id)
 }
 
-Deno.test('1. no license for user → 403 no_license', async () => {
+Deno.test('1. no license → Phase 1.5 amends §8.1: a trial starts instead of 403 no_license', async () => {
+  // The original case ("no license → 403 no_license") was superseded by the
+  // Phase 1.5 addendum §3: a user with no license in any status now enters
+  // the trial path (full coverage in trials.test.ts cases 22–28). This test
+  // pins the amendment itself: the no_license error is retired.
   const user = await createTestUser(uniqueEmail('ent1'))
   try {
     const res = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(randomFingerprint()) })
-    assertEquals(res.status, 403)
-    assertEquals(res.body.error, 'no_license')
+    assertEquals(res.status, 200)
+
+    const keys = await loadTestKeys()
+    const publicKey = await importJWK(keys.entitlementPublicJwk, 'EdDSA')
+    const { payload } = await jwtVerify(res.body.token, publicKey, {
+      issuer: ENTITLEMENT_ISSUER,
+      audience: ENTITLEMENT_AUDIENCE,
+    })
+    assertEquals(payload.plan, 'trial')
   } finally {
     await cleanup([user.id], [])
   }

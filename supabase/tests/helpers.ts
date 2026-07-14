@@ -201,6 +201,28 @@ export async function seedLicense(seed: SeedLicense): Promise<string> {
   return data.id as string
 }
 
+// Inserts a trial row via the service role. startedDaysAgo positions the
+// trial in its lifetime; lengthDays defaults to the product's 14.
+export async function seedTrial(
+  userId: string,
+  opts: { startedDaysAgo?: number; lengthDays?: number; fingerprint?: string } = {},
+): Promise<{ started_at: string; ends_at: string; starting_fingerprint: string }> {
+  const admin = adminClient()
+  const day = 24 * 60 * 60 * 1000
+  const startedAt = new Date(Date.now() - (opts.startedDaysAgo ?? 0) * day)
+  const endsAt = new Date(startedAt.getTime() + (opts.lengthDays ?? 14) * day)
+  const row = {
+    user_id: userId,
+    started_at: startedAt.toISOString(),
+    ends_at: endsAt.toISOString(),
+    starting_fingerprint: opts.fingerprint ?? randomFingerprint(),
+  }
+  const { data, error } = await admin
+    .from('trials').insert(row).select('started_at, ends_at, starting_fingerprint').single()
+  if (error) throw new Error(`seedTrial failed: ${error.message}`)
+  return data
+}
+
 // ---------- misc ----------
 
 export function randomFingerprint(): string {

@@ -58,6 +58,37 @@ Deno.test('token is a standard JWT verifiable via exported JWK', async () => {
   assertEquals(payload.sub, userId)
 })
 
+Deno.test('notAfter beyond 7 days does not extend the token', async () => {
+  const farFuture = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
+  const { token } = await signEntitlementToken(privateKey, {
+    userId,
+    deviceId,
+    plan: 'trial',
+    notAfter: farFuture,
+  })
+  const { payload } = await jwtVerify(token, publicKey, {
+    issuer: ENTITLEMENT_ISSUER,
+    audience: ENTITLEMENT_AUDIENCE,
+  })
+  assertEquals(payload.exp! - payload.iat!, ENTITLEMENT_TTL_SECONDS)
+})
+
+Deno.test('notAfter inside 7 days caps the token — it never outlives the trial', async () => {
+  const soon = Math.floor(Date.now() / 1000) + 24 * 60 * 60 // 1 day out
+  const { token, expiresAt } = await signEntitlementToken(privateKey, {
+    userId,
+    deviceId,
+    plan: 'trial',
+    notAfter: soon,
+  })
+  const { payload } = await jwtVerify(token, publicKey, {
+    issuer: ENTITLEMENT_ISSUER,
+    audience: ENTITLEMENT_AUDIENCE,
+  })
+  assertEquals(payload.exp, soon)
+  assertEquals(Date.parse(expiresAt), soon * 1000)
+})
+
 Deno.test('token does not verify against a different key', async () => {
   const other = await generateKeyPair('EdDSA', { crv: 'Ed25519' })
   const { token } = await signEntitlementToken(privateKey, { userId, deviceId, plan: 'lifetime' })
