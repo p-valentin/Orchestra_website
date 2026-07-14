@@ -1,6 +1,11 @@
 # Minimal Supabase CLI config — unspecified sections use CLI defaults.
 project_id = "orchestra-license"
 
+# Unverified throwaway signups must not get trials (Phase 1.5). Mirror this
+# in the hosted dashboard: Auth → Email → "Confirm email".
+[auth.email]
+enable_confirmations = true
+
 # All three functions require a valid Supabase Auth JWT; the gateway rejects
 # unauthenticated requests before they reach the function (verify_jwt is the
 # default — spelled out here because the endpoints are useless without it).

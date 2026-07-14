@@ -1,9 +1,13 @@
 // POST /entitlement — issue a signed 7-day entitlement token for a device.
 //
-// Order of operations (§5.1): resolve active license (auto-claiming an
-// unclaimed one by email if needed) → upsert the device within the 3-slot
-// limit → sign and return the JWT. The client caches the token and verifies
-// it offline; this endpoint is never called from the workflow execution path.
+// Order of operations (§5.1 + Phase 1.5 §3): resolve active license
+// (auto-claiming an unclaimed one by email if needed) → if the user holds no
+// license at all, resolve the self-managed 14-day trial → upsert the device
+// within the 3-slot limit → sign and return the JWT. License rules always
+// win: a refunded/revoked license never falls through to a trial, so a
+// refunded purchase cannot re-grant one. The client caches the token and
+// verifies it offline; this endpoint is never called from the workflow
+// execution path.
 
 import type { SupabaseClient, User } from 'npm:@supabase/supabase-js@2'
 import { authenticateRequest, errorResponse, json, readJsonBody, serviceClient } from '../_shared/http.ts'
@@ -14,6 +18,7 @@ import {
 import { normalizeEmail } from '../_shared/util.ts'
 
 export const MAX_ACTIVE_DEVICES = 3
+export const TRIAL_DAYS = 14
 
 const PLATFORMS = new Set(['windows', 'macos', 'linux'])
 const FINGERPRINT_RE = /^[0-9a-f]{64}$/
@@ -29,11 +34,13 @@ interface LicenseRow {
 }
 
 // Resolves the caller's active license, auto-claiming an unclaimed one whose
-// buyer_email matches. Returns the license or the 403 the caller should send.
+// buyer_email matches. Returns the license, the 403 the caller should send,
+// or { none } when the user has no license in any status — only that last
+// case may fall through to the trial path (Phase 1.5 §3a).
 async function resolveLicense(
   supabase: SupabaseClient,
   user: User,
-): Promise<{ license: LicenseRow } | { error: Response }> {
+): Promise<{ license: LicenseRow } | { error: Response } | { none: true }> {
   const { data: own, error: ownErr } = await supabase
     .from('licenses')
     .select('id, status, plan, purchased_at')
@@ -86,7 +93,55 @@ async function resolveLicense(
   }
   if (dead?.status === 'refunded') return { error: errorResponse(403, 'license_refunded') }
   if (dead?.status === 'revoked') return { error: errorResponse(403, 'license_revoked') }
-  return { error: errorResponse(403, 'no_license') }
+  return { none: true }
+}
+
+// Phase 1.5 §3b: the self-managed 14-day trial, reached only when the user
+// holds no license in any status. One trial per account (primary key) and
+// one per starting device (fingerprint soft block → support path).
+async function resolveTrial(
+  supabase: SupabaseClient,
+  user: User,
+  fingerprint: string,
+): Promise<{ endsAt: string } | { error: Response }> {
+  const { data: trial, error: findErr } = await supabase
+    .from('trials')
+    .select('ends_at')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (findErr) throw findErr
+
+  if (trial) {
+    if (Date.parse(trial.ends_at) > Date.now()) return { endsAt: trial.ends_at }
+    return { error: errorResponse(403, 'trial_expired') }
+  }
+
+  // Soft device block: a fingerprint that already started a trial under any
+  // account (it can't be this one — this user has no row) is denied.
+  const { data: fpRows, error: fpErr } = await supabase
+    .from('trials')
+    .select('user_id')
+    .eq('starting_fingerprint', fingerprint)
+    .limit(1)
+  if (fpErr) throw fpErr
+  if (fpRows && fpRows.length > 0) return { error: errorResponse(403, 'trial_unavailable') }
+
+  const endsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const { error: insertErr } = await supabase
+    .from('trials')
+    .insert({ user_id: user.id, ends_at: endsAt, starting_fingerprint: fingerprint })
+  if (insertErr) {
+    // Primary-key race: a concurrent first call already created the trial.
+    // Answer from the winning row.
+    if (insertErr.code === '23505') {
+      const { data: raced } = await supabase
+        .from('trials').select('ends_at').eq('user_id', user.id).maybeSingle()
+      if (raced && Date.parse(raced.ends_at) > Date.now()) return { endsAt: raced.ends_at }
+      return { error: errorResponse(403, 'trial_expired') }
+    }
+    throw insertErr
+  }
+  return { endsAt }
 }
 
 interface DeviceFields {
@@ -178,13 +233,26 @@ Deno.serve(async (req) => {
     const resolved = await resolveLicense(supabase, user)
     if ('error' in resolved) return resolved.error
 
+    let plan: string
+    let notAfter: number | undefined
+    if ('license' in resolved) {
+      plan = resolved.license.plan
+    } else {
+      const trial = await resolveTrial(supabase, user, fingerprint)
+      if ('error' in trial) return trial.error
+      plan = 'trial'
+      // The token must never outlive the trial (Phase 1.5 §3).
+      notAfter = Math.floor(Date.parse(trial.endsAt) / 1000)
+    }
+
     const device = await upsertDevice(supabase, user, { fingerprint, name, platform, appVersion })
     if ('error' in device) return device.error
 
     const { token, expiresAt } = await signEntitlementToken(await privateKeyPromise, {
       userId: user.id,
       deviceId: device.deviceId,
-      plan: resolved.license.plan,
+      plan,
+      notAfter,
     })
     return json(200, { token, expires_at: expiresAt })
   } catch (err) {
