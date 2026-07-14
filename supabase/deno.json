@@ -1,0 +1,8 @@
+{
+  "nodeModulesDir": "none",
+  "fmt": {
+    "semiColons": false,
+    "singleQuote": true,
+    "lineWidth": 110
+  }
+}

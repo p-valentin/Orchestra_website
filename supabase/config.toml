@@ -1,0 +1,14 @@
+# Minimal Supabase CLI config — unspecified sections use CLI defaults.
+project_id = "orchestra-license"
+
+# All three functions require a valid Supabase Auth JWT; the gateway rejects
+# unauthenticated requests before they reach the function (verify_jwt is the
+# default — spelled out here because the endpoints are useless without it).
+[functions.entitlement]
+verify_jwt = true
+
+[functions.devices]
+verify_jwt = true
+
+[functions.claim-legacy]
+verify_jwt = true
