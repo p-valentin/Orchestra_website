@@ -1,15 +1,16 @@
-# Orchestra licensing — Phase 1 backend
+# Orchestra licensing — Phase 1 backend (+ Phase 1.5 trials)
 
 Supabase backend for the $129 lifetime license: schema + RLS, entitlement
-issuance, device management, and legacy license migration. Desktop
-integration is Phase 3; Lemon Squeezy webhooks are Phase 2 (only the
-`webhook_events` table exists so far).
+issuance, device management, legacy license migration, and the self-managed
+14-day trial (Phase 1.5 addendum). Desktop integration is Phase 3; Lemon
+Squeezy webhooks are Phase 2 (only the `webhook_events` table exists so far).
 
 ## Layout
 
 ```
 supabase/
   migrations/0001_licensing.sql     schema + RLS (licenses, devices, webhook_events)
+  migrations/0002_trials.sql        Phase 1.5: trials table + RLS
   functions/
     _shared/                        token signing, legacy verification, http plumbing
     entitlement/                    POST /entitlement — issue 7-day EdDSA JWT
@@ -98,6 +99,34 @@ Example flow: `setup_test_keys` → serve functions with `.env.test` →
 `request_entitlement` (watch auto-claim + verified JWT) → repeat with new
 `device_name`s until `409 device_limit` → `deactivate_device` → retry →
 `cleanup_test_data`.
+
+## Trials (Phase 1.5)
+
+No Lemon Squeezy involvement — LS trials only exist for subscriptions. The
+trial lives entirely in `/entitlement`:
+
+- First entitlement call with **no license in any status** and no trial row
+  starts one: 14 days from that moment, full paid entitlement, `plan: "trial"`
+  in the token.
+- Token `exp = min(iat + 7 days, trial ends_at)` — a token never outlives the
+  trial. Device limit 3 applies identically.
+- One trial per account (`trials.user_id` primary key). One per starting
+  device: a fingerprint that already started a trial under another account
+  gets `403 trial_unavailable` (support path — client shows a contact link).
+- Expired → `403 trial_expired`; the client falls back to free tier.
+- **License rules always win** (§3a): refunded/revoked → those errors, never
+  a trial — so refunding a purchase cannot re-grant one. A purchase mid-trial
+  simply takes over (`plan: "lifetime"`); the trial row is left untouched.
+- The old `no_license` error is retired — the trial path replaces it.
+
+Config: email confirmations are ON locally (`[auth.email]` in config.toml) so
+throwaway signups can't farm trials — mirror in the hosted dashboard
+(Auth → Email → "Confirm email").
+
+Client obligations recorded for Phase 3 (not built now): days-remaining
+indicator + upgrade CTA while on trial; on `trial_expired` pause scheduled
+jobs and notify ("Trial ended — N scheduled workflows paused") — never let
+cron jobs die silently; free-tier fallback keeps all workflows/data intact.
 
 ## Behavioral notes
 

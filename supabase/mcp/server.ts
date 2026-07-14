@@ -457,26 +457,58 @@ server.registerTool(
     description:
       'Read license tables with the service role (bypasses RLS) to assert what the endpoints actually wrote.',
     inputSchema: {
-      table: z.enum(['licenses', 'devices', 'webhook_events']),
+      table: z.enum(['licenses', 'devices', 'webhook_events', 'trials']),
       buyer_email: z.string().optional().describe('licenses only: filter by buyer_email'),
-      user_email: z.string().optional().describe('licenses/devices: filter by a test user’s id'),
+      user_email: z.string().optional().describe('licenses/devices/trials: filter by a test user’s id'),
       limit: z.number().optional().describe('Default 20'),
     },
   },
   tool(async ({ table, buyer_email, user_email, limit }: {
-    table: 'licenses' | 'devices' | 'webhook_events'
+    table: 'licenses' | 'devices' | 'webhook_events' | 'trials'
     buyer_email?: string
     user_email?: string
     limit?: number
   }) => {
     const adm = await admin()
-    const orderCol = table === 'webhook_events' ? 'received_at' : 'created_at'
+    const orderCol = table === 'webhook_events' ? 'received_at' : table === 'trials' ? 'started_at' : 'created_at'
     let query = adm.from(table).select('*').order(orderCol, { ascending: false }).limit(limit ?? 20)
     if (buyer_email && table === 'licenses') query = query.eq('buyer_email', buyer_email.toLowerCase().trim())
     if (user_email && table !== 'webhook_events') query = query.eq('user_id', getUser(user_email).id)
     const { data, error } = await query
     if (error) throw new Error(error.message)
     return data
+  }),
+)
+
+server.registerTool(
+  'seed_trial',
+  {
+    description:
+      'Insert a trials row for a test user (Phase 1.5). days_in positions the trial in its 14-day life: 13 = one day left (token exp gets capped), 15+ = expired (403 trial_expired). Reuse a fingerprint from another user to test trial_unavailable.',
+    inputSchema: {
+      user_email: z.string().describe('A user from create_test_user'),
+      days_in: z.number().optional().describe('How many days ago the trial started; default 0'),
+      fingerprint: z.string().optional().describe('starting_fingerprint; default random'),
+    },
+  },
+  tool(async ({ user_email, days_in, fingerprint }: {
+    user_email: string
+    days_in?: number
+    fingerprint?: string
+  }) => {
+    const adm = await admin()
+    const user = getUser(user_email)
+    const day = 24 * 60 * 60 * 1000
+    const startedAt = new Date(Date.now() - (days_in ?? 0) * day)
+    const row = {
+      user_id: user.id,
+      started_at: startedAt.toISOString(),
+      ends_at: new Date(startedAt.getTime() + 14 * day).toISOString(),
+      starting_fingerprint: fingerprint ?? randomFingerprint(),
+    }
+    const { data, error } = await adm.from('trials').insert(row).select('*').single()
+    if (error) throw new Error(`insert failed: ${error.message}`)
+    return data // cleanup: cascades when cleanup_test_data deletes the user
   }),
 )
 
