@@ -130,13 +130,11 @@ psql "$DB_URL" -f seed.sql   # or: supabase db execute --file seed.sql
 
 Skipping this is fine — rows are created on first claim.
 
-## Open items (carried from the brief)
+## Decisions (confirmed by Vali, 2026-07-14)
 
-- Device limit 3: implemented per the brief (`MAX_ACTIVE_DEVICES` in
-  `supabase/functions/entitlement/index.ts`) — flag if it should differ.
-- Customers granted licenses through the website admin (`lib/licenseGrants.ts`)
-  have **no token**. If any exist at migration time, seed them as unclaimed
-  rows so email auto-claim picks them up — note the schema requires an origin,
-  so give them a synthetic `ls_order_id` like `grant:<email>` or use
-  `seed-legacy.ts` (their deterministic token hash is computable even though
-  no token was ever delivered).
+- **Device limit is 3** (`MAX_ACTIVE_DEVICES` in
+  `supabase/functions/entitlement/index.ts`).
+- **Admin-granted licenses never get tokens.** If any grants from the website
+  admin (`lib/licenseGrants.ts`) need migrating, seed them as unclaimed rows
+  with a synthetic `ls_order_id` (e.g. `grant:<email>`) — email auto-claim in
+  `/entitlement` attaches them on first sign-in; no token is ever issued.
