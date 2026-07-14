@@ -18,6 +18,7 @@ supabase/
   tests/
     unit/                           pure logic, no stack needed
     integration/                    §8 cases 1–21, needs local stack
+  mcp/server.ts                     MCP server for interactive testing (.mcp.json)
 scripts/
   generate-keys.ts                  mint the ENTITLEMENT_PRIVATE_KEY pair
   derive-legacy-public-key.ts       LEGACY_SIGNING_KEY from the website's LICENSE_PRIVATE_KEY
@@ -71,6 +72,32 @@ supabase functions serve --env-file supabase/functions/.env.test &
 set -a; eval "$(supabase status -o env)"; set +a   # exports API_URL, ANON_KEY, SERVICE_ROLE_KEY
 deno test -A supabase/tests
 ```
+
+## Interactive testing (MCP)
+
+`.mcp.json` registers an `orchestra-license-test` MCP server (approve it when
+Claude Code asks on next launch). It targets the local stack automatically via
+`supabase status`, or a hosted project when `SUPABASE_URL` /
+`SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` are set. Tools:
+
+- `stack_status` — where it's pointed, whether functions are reachable
+- `setup_test_keys` — throwaway signing keys (`.env.test` + `.keys.test.json`)
+- `create_test_user` — confirmed auth user, remembered by email
+- `seed_license` — insert any license shape (active/refunded/revoked, claimed
+  or unclaimed, LS or legacy origin)
+- `mint_legacy_token` — real signed legacy tokens, plus `include_exp`
+  (app-token) and `tamper` variants that must be rejected
+- `claim_legacy`, `request_entitlement`, `list_devices`, `deactivate_device` —
+  drive the endpoints as that user; entitlement responses get their JWT
+  verified against the test public key
+- `db_rows` — service-role reads to assert what was written
+- `cleanup_test_data` — remove everything the session created
+
+Example flow: `setup_test_keys` → serve functions with `.env.test` →
+`create_test_user` → `seed_license` (unclaimed, same email) →
+`request_entitlement` (watch auto-claim + verified JWT) → repeat with new
+`device_name`s until `409 device_limit` → `deactivate_device` → retry →
+`cleanup_test_data`.
 
 ## Behavioral notes
 
