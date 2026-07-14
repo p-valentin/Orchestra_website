@@ -245,6 +245,63 @@ Deno.test('8. returned JWT: EdDSA, verifies with public key, 7-day life, sub/dev
   }
 })
 
+Deno.test('7b. revoked device reactivates into a free slot; never into a full one', async () => {
+  const email = uniqueEmail('ent7b')
+  const user = await createTestUser(email)
+  const licenseId = await seedLicense({ buyer_email: email, user_id: user.id })
+  const fpA = randomFingerprint()
+  try {
+    // Activate A, revoke it, and let it come back while slots are free:
+    // same row, revoked_at cleared.
+    const first = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(fpA) })
+    assertEquals(first.status, 200)
+    const { data: deviceA } = await admin
+      .from('devices').select('id').eq('user_id', user.id).eq('fingerprint_hash', fpA).single()
+    await callFn('devices/deactivate', { token: user.accessToken, body: { device_id: deviceA!.id } })
+
+    const back = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(fpA) })
+    assertEquals(back.status, 200)
+    const { data: rowsA } = await admin
+      .from('devices').select('id, revoked_at').eq('user_id', user.id).eq('fingerprint_hash', fpA)
+    assertEquals(rowsA!.length, 1)
+    assertEquals(rowsA![0].id, deviceA!.id)
+    assertEquals(rowsA![0].revoked_at, null)
+
+    // Fill the house without A (revoke A, add B/C/D), then A's return must 409
+    // and its revoked_at must survive — reactivation never steals a slot.
+    await callFn('devices/deactivate', { token: user.accessToken, body: { device_id: deviceA!.id } })
+    for (let i = 0; i < 3; i++) {
+      const ok = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(randomFingerprint()) })
+      assertEquals(ok.status, 200)
+    }
+    const blocked = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(fpA) })
+    assertEquals(blocked.status, 409)
+    assertEquals(blocked.body.error, 'device_limit')
+    const { data: stillRevoked } = await admin.from('devices').select('revoked_at').eq('id', deviceA!.id).single()
+    assert(stillRevoked!.revoked_at !== null)
+  } finally {
+    await cleanup([user.id], [licenseId])
+  }
+})
+
+Deno.test('input validation: malformed fingerprint → 400 invalid_request', async () => {
+  const email = uniqueEmail('entfp')
+  const user = await createTestUser(email)
+  const licenseId = await seedLicense({ buyer_email: email, user_id: user.id })
+  try {
+    for (const bad of ['', 'short', 'not-a-sha256-hex-fingerprint', 'g'.repeat(64), 42, null]) {
+      const res = await callFn('entitlement', {
+        token: user.accessToken,
+        body: { ...entitlementBody(randomFingerprint()), fingerprint: bad },
+      })
+      assertEquals(res.status, 400, `should 400 for fingerprint: ${JSON.stringify(bad)}`)
+      assertEquals(res.body.error, 'invalid_request')
+    }
+  } finally {
+    await cleanup([user.id], [licenseId])
+  }
+})
+
 Deno.test('9. missing or invalid auth JWT → 401', async () => {
   const noAuth = await callFn('entitlement', { body: entitlementBody(randomFingerprint()) })
   assertEquals(noAuth.status, 401)
