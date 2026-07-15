@@ -94,6 +94,8 @@ interface RegisteredUser {
 const users = new Map<string, RegisteredUser>() // by email
 const seededLicenseIds = new Set<string>()
 const fingerprints = new Map<string, string>() // `${email}|${device_name}` → stable fingerprint
+const lsOrderIds = new Set<string>() // orders simulated via send_ls_webhook
+const lsEventIds = new Set<string>() // webhook_events rows those calls created
 
 function getUser(email: string): RegisteredUser {
   const user = users.get(email.toLowerCase().trim())
@@ -574,6 +576,78 @@ server.registerTool(
 )
 
 server.registerTool(
+  'send_ls_webhook',
+  {
+    description:
+      'Simulate a Lemon Squeezy webhook delivery: builds an order payload, signs it with LS_WEBHOOK_SECRET from supabase/functions/.env.test (HMAC-SHA256 hex, like LS does), and POSTs it to /webhooks-lemonsqueezy. Use corrupt_signature or raw_body to exercise the rejection paths.',
+    inputSchema: {
+      event_name: z.string().describe("e.g. 'order_created', 'order_refunded', or any type to test the store-and-ignore path"),
+      order_id: z.string().describe('LS order id — the idempotency key together with event_name'),
+      email: z.string().optional().describe('Buyer email in the payload'),
+      order_status: z.string().optional().describe("Default: 'refunded' for order_refunded, else 'paid'"),
+      order_number: z.number().optional(),
+      corrupt_signature: z.boolean().optional().describe('Send a wrong signature — must yield 401'),
+      raw_body: z.string().optional().describe('Send this exact body instead of a built payload (still correctly signed unless corrupt_signature)'),
+    },
+  },
+  tool(async ({ event_name, order_id, email, order_status, order_number, corrupt_signature, raw_body }: {
+    event_name: string
+    order_id: string
+    email?: string
+    order_status?: string
+    order_number?: number
+    corrupt_signature?: boolean
+    raw_body?: string
+  }) => {
+    const cfg = await resolveConfig()
+    const envText = await Deno.readTextFile(new URL('../functions/.env.test', import.meta.url))
+    const secret = envText.match(/^LS_WEBHOOK_SECRET=(.+)$/m)?.[1]?.trim()
+    if (!secret) throw new Error('LS_WEBHOOK_SECRET missing from supabase/functions/.env.test — run setup_test_keys')
+
+    const body = raw_body ?? JSON.stringify({
+      meta: { event_name, test_mode: true },
+      data: {
+        type: 'orders',
+        id: order_id,
+        attributes: {
+          identifier: crypto.randomUUID(),
+          order_number: order_number ?? 10001,
+          user_email: email ?? 'buyer@example.test',
+          status: order_status ?? (event_name === 'order_refunded' ? 'refunded' : 'paid'),
+          total: 12900,
+          currency: 'USD',
+        },
+      },
+    })
+
+    const key = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+    )
+    const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))
+    let signature = Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, '0')).join('')
+    if (corrupt_signature) signature = signature.replace(/^..../, '0000')
+
+    const res = await fetch(`${cfg.url}/functions/v1/webhooks-lemonsqueezy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Signature': signature, 'X-Event-Name': event_name },
+      body,
+    })
+    const text = await res.text()
+    if (res.status === 200) {
+      lsOrderIds.add(order_id)
+      lsEventIds.add(`${event_name}:${order_id}`)
+    }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      parsed = { raw: text }
+    }
+    return { status: res.status, body: parsed }
+  }),
+)
+
+server.registerTool(
   'cleanup_test_data',
   {
     description:
@@ -593,12 +667,23 @@ server.registerTool(
       const { data } = await adm.from('licenses').delete().in('id', [...seededLicenseIds]).select('id')
       licensesDeleted += data?.length ?? 0
     }
+    if (lsOrderIds.size > 0) {
+      const { data } = await adm.from('licenses').delete().in('ls_order_id', [...lsOrderIds]).select('id')
+      licensesDeleted += data?.length ?? 0
+    }
+    let eventsDeleted = 0
+    if (lsEventIds.size > 0) {
+      const { data } = await adm.from('webhook_events').delete().in('event_id', [...lsEventIds]).select('id')
+      eventsDeleted = data?.length ?? 0
+    }
     for (const id of userIds) await adm.auth.admin.deleteUser(id)
 
-    const summary = { users_deleted: userIds.length, licenses_deleted: licensesDeleted }
+    const summary = { users_deleted: userIds.length, licenses_deleted: licensesDeleted, webhook_events_deleted: eventsDeleted }
     users.clear()
     seededLicenseIds.clear()
     fingerprints.clear()
+    lsOrderIds.clear()
+    lsEventIds.clear()
     return summary
   }),
 )

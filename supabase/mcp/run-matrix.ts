@@ -90,8 +90,8 @@ const toolList = (await rpc('tools/list', {})) as { tools: Array<{ name: string 
 const names = toolList.tools.map((t) => t.name).sort()
 console.log(`tools: ${names.join(', ')}\n`)
 check(
-  ['warp_trial', 'set_license_status', 'seed_trial'].every((t) => names.includes(t)),
-  'server exposes the Phase 1.5 tools',
+  ['warp_trial', 'set_license_status', 'seed_trial', 'send_ls_webhook'].every((t) => names.includes(t)),
+  'server exposes the Phase 1.5 + 2 tools',
   names,
 )
 
@@ -262,6 +262,60 @@ check(trialAfter.data?.length === 1, 'trial row untouched by the purchase', tria
 await call('set_license_status', { buyer_email: 'mx-trial@phase1.test', status: 'refunded' })
 const refundWins = await call('request_entitlement', { user_email: 'mx-trial@phase1.test', device_name: 'Trial-PC' })
 check(refundWins.data?.body?.error === 'license_refunded', 'refund → 403 license_refunded, never falls back to trial', refundWins.data?.body)
+
+// ---------- F. Lemon Squeezy webhooks (Phase 2) ----------
+
+console.log('\n— lemon squeezy webhooks —')
+let lsOrder = Date.now()
+const orderA = String(++lsOrder)
+
+const badSig = await call('send_ls_webhook', {
+  event_name: 'order_created', order_id: orderA, email: 'ls@phase2.test', corrupt_signature: true,
+})
+check(badSig.data?.status === 401, 'corrupt signature → 401', badSig.data)
+
+const created = await call('send_ls_webhook', {
+  event_name: 'order_created', order_id: orderA, email: '  LS-Buyer@Phase2.TEST ',
+})
+check(created.data?.status === 200, 'order_created → 200', created.data)
+const lsLic = await call('db_rows', { table: 'licenses', buyer_email: 'ls-buyer@phase2.test' })
+check(lsLic.data?.[0]?.ls_order_id === orderA && lsLic.data?.[0]?.status === 'active', 'license row: normalized email, active', lsLic.data)
+check(lsLic.data?.[0]?.user_id === null, 'unknown email → unclaimed', lsLic.data)
+
+const replay = await call('send_ls_webhook', {
+  event_name: 'order_created', order_id: orderA, email: 'ls-buyer@phase2.test',
+})
+check(replay.data?.status === 200, 'replayed delivery → 200', replay.data)
+const lsLic2 = await call('db_rows', { table: 'licenses', buyer_email: 'ls-buyer@phase2.test' })
+check(lsLic2.data?.length === 1, 'still exactly one license row', lsLic2.data?.length)
+
+const refund = await call('send_ls_webhook', { event_name: 'order_refunded', order_id: orderA })
+check(refund.data?.status === 200, 'order_refunded → 200', refund.data)
+const lsLic3 = await call('db_rows', { table: 'licenses', buyer_email: 'ls-buyer@phase2.test' })
+check(lsLic3.data?.[0]?.status === 'refunded', 'status flipped to refunded', lsLic3.data)
+
+// Out-of-order: refund lands first, late order_created cannot resurrect it.
+const orderB = String(++lsOrder)
+await call('send_ls_webhook', { event_name: 'order_refunded', order_id: orderB, email: 'ooo@phase2.test' })
+await call('send_ls_webhook', { event_name: 'order_created', order_id: orderB, email: 'ooo@phase2.test' })
+const oooRows = await call('db_rows', { table: 'licenses', buyer_email: 'ooo@phase2.test' })
+check(oooRows.data?.length === 1 && oooRows.data?.[0]?.status === 'refunded', 'refund-first stays refunded after late create', oooRows.data)
+
+// Purchase attaches instantly when the account already exists.
+const orderC = String(++lsOrder)
+const lsAccount = await call('create_test_user', { email: 'mx-ls-account@phase1.test' })
+check(!lsAccount.isError, 'create account for instant attach', lsAccount.text)
+await call('send_ls_webhook', { event_name: 'order_created', order_id: orderC, email: 'MX-LS-Account@Phase1.TEST' })
+const attached = await call('db_rows', { table: 'licenses', user_email: 'mx-ls-account@phase1.test' })
+check(attached.data?.[0]?.ls_order_id === orderC && attached.data?.[0]?.claimed_at != null, 'existing account → auto-attached', attached.data)
+
+const unknownEvt = await call('send_ls_webhook', { event_name: 'affiliate_activated', order_id: String(++lsOrder) })
+check(unknownEvt.data?.status === 200, 'unknown event type → 200 no-op', unknownEvt.data)
+
+const malformed = await call('send_ls_webhook', {
+  event_name: 'order_created', order_id: String(++lsOrder), raw_body: 'not json at all {{{',
+})
+check(malformed.data?.status === 400, 'malformed signed body → 400', malformed.data)
 
 // ---------- F. cleanup ----------
 
