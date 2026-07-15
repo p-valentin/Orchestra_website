@@ -25,6 +25,12 @@ export interface EntitlementInput {
   // Epoch-seconds ceiling on exp. Trials pass their ends_at here so a token
   // can never outlive the trial: exp = min(iat + 7 days, notAfter).
   notAfter?: number
+  // Epoch seconds the trial actually ends. Carried as its own claim because
+  // `exp` cannot answer "how long is left": for the first week of a 14-day
+  // trial exp is the 7-day token cap, so a countdown derived from it would
+  // tell a day-1 user they have 7 days left. Signed, so the client can trust
+  // it without asking.
+  trialEndsAt?: number
 }
 
 export async function signEntitlementToken(
@@ -33,7 +39,12 @@ export async function signEntitlementToken(
 ): Promise<{ token: string; expiresAt: string }> {
   const iat = Math.floor(Date.now() / 1000)
   const exp = Math.min(iat + ENTITLEMENT_TTL_SECONDS, input.notAfter ?? Infinity)
-  const token = await new SignJWT({ dev: input.deviceId, plan: input.plan, status: 'active' })
+  const token = await new SignJWT({
+    dev: input.deviceId,
+    plan: input.plan,
+    status: 'active',
+    ...(input.trialEndsAt !== undefined ? { trial_ends_at: input.trialEndsAt } : {}),
+  })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT', kid: ENTITLEMENT_KID })
     .setIssuer(ENTITLEMENT_ISSUER)
     .setAudience(ENTITLEMENT_AUDIENCE)

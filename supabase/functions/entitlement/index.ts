@@ -235,14 +235,18 @@ Deno.serve(async (req) => {
 
     let plan: string
     let notAfter: number | undefined
+    let trialEndsAt: number | undefined
     if ('license' in resolved) {
       plan = resolved.license.plan
     } else {
       const trial = await resolveTrial(supabase, user, fingerprint)
       if ('error' in trial) return trial.error
       plan = 'trial'
-      // The token must never outlive the trial (Phase 1.5 §3).
-      notAfter = Math.floor(Date.parse(trial.endsAt) / 1000)
+      // The token must never outlive the trial (Phase 1.5 §3)...
+      trialEndsAt = Math.floor(Date.parse(trial.endsAt) / 1000)
+      // ...but exp is also capped at 7 days, so it can't double as the
+      // countdown: the client gets the real end as its own signed claim.
+      notAfter = trialEndsAt
     }
 
     const device = await upsertDevice(supabase, user, { fingerprint, name, platform, appVersion })
@@ -253,6 +257,7 @@ Deno.serve(async (req) => {
       deviceId: device.deviceId,
       plan,
       notAfter,
+      trialEndsAt,
     })
     return json(200, { token, expires_at: expiresAt })
   } catch (err) {
