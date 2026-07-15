@@ -13,11 +13,12 @@ export function claimEmailText(reference: string | null): string {
   return [
     'Thanks for buying Orchestra!',
     '',
-    'Already have an account? Just log in with this email address in the app —',
-    'your license attaches automatically.',
+    'Already have an account? Just sign in with this email address in Orchestra —',
+    'your license attaches automatically. There is no key to copy.',
     '',
-    'New to Orchestra? Download the app and create your account with this',
-    `email address: ${SITE_URL}/downloads`,
+    'New here? Two steps:',
+    `  1. Create your account with THIS email address: ${SITE_URL}/signup`,
+    `  2. Download Orchestra and sign in: ${SITE_URL}/downloads`,
     '',
     reference !== null ? `Order reference (for support): ${reference}` : 'Questions? Just reply to this email.',
   ].join('\n')
