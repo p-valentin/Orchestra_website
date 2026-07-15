@@ -9,7 +9,7 @@ const admin = adminClient()
 Deno.test('21. duplicate (provider, event_id) insert violates the unique constraint', async () => {
   const eventId = `evt-${crypto.randomUUID()}`
   const row = {
-    provider: 'lemonsqueezy',
+    provider: 'paddle',
     event_id: eventId,
     event_name: 'order_created',
     payload: { test: true },

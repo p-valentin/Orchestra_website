@@ -157,9 +157,13 @@ export async function signLegacyToken(
   return `${body}.${b64url(new Uint8Array(sig))}`
 }
 
-// Signs a request body the way Lemon Squeezy does: HMAC-SHA256 over the raw
-// body with the webhook signing secret, hex-encoded (X-Signature header).
-export async function signLsWebhook(secret: string, rawBody: string): Promise<string> {
+// Signs a request body the way Paddle does: `Paddle-Signature: ts=<unix>;
+// h1=<hex hmac-sha256 of "<ts>:<raw body>" with the endpoint secret>`.
+export async function signPaddleWebhook(
+  secret: string,
+  rawBody: string,
+  ts: number = Math.floor(Date.now() / 1000),
+): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -167,24 +171,20 @@ export async function signLsWebhook(secret: string, rawBody: string): Promise<st
     false,
     ['sign'],
   )
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
-  return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, '0')).join('')
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${ts}:${rawBody}`))
+  const h1 = Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, '0')).join('')
+  return `ts=${ts};h1=${h1}`
 }
 
-// Posts a raw (pre-serialized) body to the LS webhook function — raw because
-// the signature covers exact bytes, so JSON re-serialization would break it.
-export async function postLsWebhook(
+// Posts a raw (pre-serialized) body to the Paddle webhook function — raw
+// because the signature covers exact bytes, so re-serialization would break it.
+export async function postPaddleWebhook(
   rawBody: string,
-  opts: { signature: string; eventName?: string },
+  opts: { signature: string },
 ): Promise<FnResponse> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Signature': opts.signature,
-  }
-  if (opts.eventName) headers['X-Event-Name'] = opts.eventName
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/webhooks-lemonsqueezy`, {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/webhooks-paddle`, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json', 'Paddle-Signature': opts.signature },
     body: rawBody,
   })
   const text = await res.text()
@@ -202,7 +202,7 @@ export async function postLsWebhook(
 export interface TestKeys {
   legacyPrivateKeyPkcs8B64: string
   entitlementPublicJwk: JWK
-  lsWebhookSecret: string
+  paddleWebhookSecret: string
 }
 
 export async function loadTestKeys(): Promise<TestKeys> {
@@ -220,20 +220,20 @@ export interface SeedLicense {
   buyer_email: string
   user_id?: string | null
   status?: 'active' | 'refunded' | 'revoked'
-  ls_order_id?: string
+  order_id?: string
   legacy_token_hash?: string
   claimed_at?: string
 }
 
 // Inserts a license row via the service role. The schema requires an origin
-// (ls_order_id or legacy_token_hash), so default to a unique fake order id.
+// (order_id or legacy_token_hash), so default to a unique fake order id.
 export async function seedLicense(seed: SeedLicense): Promise<string> {
   const admin = adminClient()
   const row = {
     buyer_email: seed.buyer_email.toLowerCase().trim(),
     user_id: seed.user_id ?? null,
     status: seed.status ?? 'active',
-    ls_order_id: seed.legacy_token_hash ? undefined : (seed.ls_order_id ?? `test-order-${crypto.randomUUID()}`),
+    order_id: seed.legacy_token_hash ? undefined : (seed.order_id ?? `test-order-${crypto.randomUUID()}`),
     legacy_token_hash: seed.legacy_token_hash,
     claimed_at: seed.claimed_at ?? (seed.user_id ? new Date().toISOString() : undefined),
   }

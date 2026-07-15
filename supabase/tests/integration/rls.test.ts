@@ -62,7 +62,7 @@ Deno.test('20. authenticated role cannot INSERT/UPDATE/DELETE licenses or device
     // INSERT: rejected outright (no policy).
     const licIns = await asUser.from('licenses').insert({
       buyer_email: user.email,
-      ls_order_id: `forged-${crypto.randomUUID()}`,
+      order_id: `forged-${crypto.randomUUID()}`,
     })
     assert(licIns.error !== null, 'license INSERT must be rejected')
     const devIns = await asUser.from('devices').insert({
