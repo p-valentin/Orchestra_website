@@ -94,8 +94,8 @@ interface RegisteredUser {
 const users = new Map<string, RegisteredUser>() // by email
 const seededLicenseIds = new Set<string>()
 const fingerprints = new Map<string, string>() // `${email}|${device_name}` → stable fingerprint
-const lsOrderIds = new Set<string>() // orders simulated via send_ls_webhook
-const lsEventIds = new Set<string>() // webhook_events rows those calls created
+const paddleTxnIds = new Set<string>() // transactions simulated via send_paddle_webhook
+const paddleEventIds = new Set<string>() // webhook_events rows those calls created
 
 function getUser(email: string): RegisteredUser {
   const user = users.get(email.toLowerCase().trim())
@@ -291,12 +291,12 @@ server.registerTool(
   'seed_license',
   {
     description:
-      'Insert a license row via the service role (what a Lemon Squeezy purchase or pre-seeded legacy import would create). Leave claim_for_user_email unset to test email auto-claim.',
+      'Insert a license row via the service role (what a Paddle purchase or pre-seeded legacy import would create). Leave claim_for_user_email unset to test email auto-claim.',
     inputSchema: {
       buyer_email: z.string().describe('Purchase email; auto-claim matches it against the account email'),
       status: z.enum(['active', 'refunded', 'revoked']).optional().describe('Default active'),
       claim_for_user_email: z.string().optional().describe('Attach to this test user (sets user_id + claimed_at)'),
-      legacy_token: z.string().optional().describe('Store this token’s sha256 as the origin instead of a fake LS order id'),
+      legacy_token: z.string().optional().describe('Store this token’s sha256 as the origin instead of a fake order id'),
     },
   },
   tool(async ({ buyer_email, status, claim_for_user_email, legacy_token }: {
@@ -312,7 +312,7 @@ server.registerTool(
       status: status ?? 'active',
       user_id: user?.id ?? null,
       claimed_at: user ? new Date().toISOString() : null,
-      ls_order_id: legacy_token ? null : `mcp-test-${crypto.randomUUID()}`,
+      order_id: legacy_token ? null : `mcp-test-${crypto.randomUUID()}`,
       legacy_token_hash: legacy_token ? await sha256Hex(legacy_token.trim()) : null,
     }
     const { data, error } = await adm.from('licenses').insert(row).select('*').single()
@@ -465,13 +465,15 @@ server.registerTool(
     inputSchema: {
       table: z.enum(['licenses', 'devices', 'webhook_events', 'trials']),
       buyer_email: z.string().optional().describe('licenses only: filter by buyer_email'),
+      order_id: z.string().optional().describe('licenses only: filter by provider order/transaction id'),
       user_email: z.string().optional().describe('licenses/devices/trials: filter by a test user’s id'),
       limit: z.number().optional().describe('Default 20'),
     },
   },
-  tool(async ({ table, buyer_email, user_email, limit }: {
+  tool(async ({ table, buyer_email, order_id, user_email, limit }: {
     table: 'licenses' | 'devices' | 'webhook_events' | 'trials'
     buyer_email?: string
+    order_id?: string
     user_email?: string
     limit?: number
   }) => {
@@ -479,6 +481,7 @@ server.registerTool(
     const orderCol = table === 'webhook_events' ? 'received_at' : table === 'trials' ? 'started_at' : 'created_at'
     let query = adm.from(table).select('*').order(orderCol, { ascending: false }).limit(limit ?? 20)
     if (buyer_email && table === 'licenses') query = query.eq('buyer_email', buyer_email.toLowerCase().trim())
+    if (order_id && table === 'licenses') query = query.eq('order_id', order_id)
     if (user_email && table !== 'webhook_events') query = query.eq('user_id', getUser(user_email).id)
     const { data, error } = await query
     if (error) throw new Error(error.message)
@@ -575,75 +578,115 @@ server.registerTool(
   }),
 )
 
+async function signPaddle(secret: string, body: string): Promise<string> {
+  const ts = Math.floor(Date.now() / 1000)
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  )
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${ts}:${body}`))
+  const h1 = Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, '0')).join('')
+  return `ts=${ts};h1=${h1}`
+}
+
 server.registerTool(
-  'send_ls_webhook',
+  'send_paddle_webhook',
   {
     description:
-      'Simulate a Lemon Squeezy webhook delivery: builds an order payload, signs it with LS_WEBHOOK_SECRET from supabase/functions/.env.test (HMAC-SHA256 hex, like LS does), and POSTs it to /webhooks-lemonsqueezy. Use corrupt_signature or raw_body to exercise the rejection paths.',
+      'Simulate a Paddle webhook delivery, signed with PADDLE_WEBHOOK_SECRET from supabase/functions/.env.test (ts/h1 HMAC like Paddle sends) and POSTed to /webhooks-paddle. event_type "purchase" is a convenience that sends customer.created (with the email) followed by transaction.completed — the normal Paddle sequence. Use corrupt_signature or raw_body for rejection paths.',
     inputSchema: {
-      event_name: z.string().describe("e.g. 'order_created', 'order_refunded', or any type to test the store-and-ignore path"),
-      order_id: z.string().describe('LS order id — the idempotency key together with event_name'),
-      email: z.string().optional().describe('Buyer email in the payload'),
-      order_status: z.string().optional().describe("Default: 'refunded' for order_refunded, else 'paid'"),
-      order_number: z.number().optional(),
+      event_type: z.enum(['purchase', 'transaction.completed', 'customer.created', 'refund', 'refund_pending', 'other'])
+        .describe("'purchase' = customer.created + transaction.completed; 'refund' = approved adjustment; 'other' = an unrelated stored-only event"),
+      transaction_id: z.string().optional().describe('txn id — idempotency scope for purchases/refunds'),
+      customer_id: z.string().optional().describe('ctm id; default derived from transaction_id'),
+      email: z.string().optional().describe('Buyer email (goes into customer.created)'),
       corrupt_signature: z.boolean().optional().describe('Send a wrong signature — must yield 401'),
       raw_body: z.string().optional().describe('Send this exact body instead of a built payload (still correctly signed unless corrupt_signature)'),
     },
   },
-  tool(async ({ event_name, order_id, email, order_status, order_number, corrupt_signature, raw_body }: {
-    event_name: string
-    order_id: string
+  tool(async ({ event_type, transaction_id, customer_id, email, corrupt_signature, raw_body }: {
+    event_type: 'purchase' | 'transaction.completed' | 'customer.created' | 'refund' | 'refund_pending' | 'other'
+    transaction_id?: string
+    customer_id?: string
     email?: string
-    order_status?: string
-    order_number?: number
     corrupt_signature?: boolean
     raw_body?: string
   }) => {
     const cfg = await resolveConfig()
     const envText = await Deno.readTextFile(new URL('../functions/.env.test', import.meta.url))
-    const secret = envText.match(/^LS_WEBHOOK_SECRET=(.+)$/m)?.[1]?.trim()
-    if (!secret) throw new Error('LS_WEBHOOK_SECRET missing from supabase/functions/.env.test — run setup_test_keys')
+    const secret = envText.match(/^PADDLE_WEBHOOK_SECRET=(.+)$/m)?.[1]?.trim()
+    if (!secret) throw new Error('PADDLE_WEBHOOK_SECRET missing from supabase/functions/.env.test — run setup_test_keys')
 
-    const body = raw_body ?? JSON.stringify({
-      meta: { event_name, test_mode: true },
-      data: {
-        type: 'orders',
-        id: order_id,
-        attributes: {
-          identifier: crypto.randomUUID(),
-          order_number: order_number ?? 10001,
-          user_email: email ?? 'buyer@example.test',
-          status: order_status ?? (event_name === 'order_refunded' ? 'refunded' : 'paid'),
-          total: 12900,
-          currency: 'USD',
-        },
-      },
-    })
+    const txn = transaction_id ?? `txn_mcp_${crypto.randomUUID().slice(0, 8)}`
+    const ctm = customer_id ?? `ctm_for_${txn}`
 
-    const key = await crypto.subtle.importKey(
-      'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-    )
-    const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))
-    let signature = Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, '0')).join('')
-    if (corrupt_signature) signature = signature.replace(/^..../, '0000')
-
-    const res = await fetch(`${cfg.url}/functions/v1/webhooks-lemonsqueezy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Signature': signature, 'X-Event-Name': event_name },
-      body,
-    })
-    const text = await res.text()
-    if (res.status === 200) {
-      lsOrderIds.add(order_id)
-      lsEventIds.add(`${event_name}:${order_id}`)
+    const bodies: string[] = []
+    if (raw_body !== undefined) {
+      bodies.push(raw_body)
+    } else {
+      const evt = () => `evt_${crypto.randomUUID()}`
+      if (event_type === 'purchase' || event_type === 'customer.created') {
+        bodies.push(JSON.stringify({
+          event_id: evt(),
+          event_type: 'customer.created',
+          occurred_at: new Date().toISOString(),
+          data: { id: ctm, email: email ?? 'buyer@example.test', status: 'active' },
+        }))
+      }
+      if (event_type === 'purchase' || event_type === 'transaction.completed') {
+        bodies.push(JSON.stringify({
+          event_id: evt(),
+          event_type: 'transaction.completed',
+          occurred_at: new Date().toISOString(),
+          data: { id: txn, status: 'completed', customer_id: ctm, currency_code: 'USD' },
+        }))
+      }
+      if (event_type === 'refund' || event_type === 'refund_pending') {
+        bodies.push(JSON.stringify({
+          event_id: evt(),
+          event_type: 'adjustment.updated',
+          occurred_at: new Date().toISOString(),
+          data: {
+            id: `adj_${crypto.randomUUID().slice(0, 8)}`,
+            action: 'refund',
+            status: event_type === 'refund' ? 'approved' : 'pending_approval',
+            transaction_id: txn,
+          },
+        }))
+      }
+      if (event_type === 'other') {
+        bodies.push(JSON.stringify({
+          event_id: evt(),
+          event_type: 'subscription.activated',
+          data: { id: `sub_${crypto.randomUUID().slice(0, 8)}` },
+        }))
+      }
     }
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(text)
-    } catch {
-      parsed = { raw: text }
+
+    const results = []
+    for (const body of bodies) {
+      let signature = await signPaddle(secret, body)
+      if (corrupt_signature) signature = signature.replace(/h1=..../, 'h1=0000')
+      const res = await fetch(`${cfg.url}/functions/v1/webhooks-paddle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Paddle-Signature': signature },
+        body,
+      })
+      const text = await res.text()
+      if (res.status === 200) {
+        paddleTxnIds.add(txn)
+        try {
+          paddleEventIds.add(JSON.parse(body).event_id)
+        } catch { /* raw_body may not be JSON */ }
+      }
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        parsed = { raw: text }
+      }
+      results.push({ status: res.status, body: parsed })
     }
-    return { status: res.status, body: parsed }
+    return { transaction_id: txn, customer_id: ctm, deliveries: results }
   }),
 )
 
@@ -667,13 +710,13 @@ server.registerTool(
       const { data } = await adm.from('licenses').delete().in('id', [...seededLicenseIds]).select('id')
       licensesDeleted += data?.length ?? 0
     }
-    if (lsOrderIds.size > 0) {
-      const { data } = await adm.from('licenses').delete().in('ls_order_id', [...lsOrderIds]).select('id')
+    if (paddleTxnIds.size > 0) {
+      const { data } = await adm.from('licenses').delete().in('order_id', [...paddleTxnIds]).select('id')
       licensesDeleted += data?.length ?? 0
     }
     let eventsDeleted = 0
-    if (lsEventIds.size > 0) {
-      const { data } = await adm.from('webhook_events').delete().in('event_id', [...lsEventIds]).select('id')
+    if (paddleEventIds.size > 0) {
+      const { data } = await adm.from('webhook_events').delete().in('event_id', [...paddleEventIds]).select('id')
       eventsDeleted = data?.length ?? 0
     }
     for (const id of userIds) await adm.auth.admin.deleteUser(id)
@@ -682,8 +725,8 @@ server.registerTool(
     users.clear()
     seededLicenseIds.clear()
     fingerprints.clear()
-    lsOrderIds.clear()
-    lsEventIds.clear()
+    paddleTxnIds.clear()
+    paddleEventIds.clear()
     return summary
   }),
 )

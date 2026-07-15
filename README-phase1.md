@@ -2,8 +2,10 @@
 
 Supabase backend for the $129 lifetime license: schema + RLS, entitlement
 issuance, device management, legacy license migration, the self-managed
-14-day trial (Phase 1.5), and Lemon Squeezy payments via webhooks (Phase 2).
-Desktop integration is Phase 3.
+14-day trial (Phase 1.5), and Paddle payments via webhooks (Phase 2 — Paddle
+replaced Lemon Squeezy because it onboards unregistered individuals in
+Romania; the provider surface was one module by design). Desktop integration
+is Phase 3.
 
 ## Layout
 
@@ -12,12 +14,13 @@ supabase/
   migrations/0001_licensing.sql     schema + RLS (licenses, devices, webhook_events)
   migrations/0002_trials.sql        Phase 1.5: trials table + RLS
   migrations/0003_ls_webhook.sql    Phase 2: user_id_by_email() for auto-attach
+  migrations/0004_paddle.sql        Phase 2: provider switch (order_id column)
   functions/
     _shared/                        token signing, legacy verification, http plumbing
     entitlement/                    POST /entitlement — issue 7-day EdDSA JWT
     devices/                        GET /devices, POST /devices/deactivate
     claim-legacy/                   POST /claim-legacy — redeem old-format license keys
-    webhooks-lemonsqueezy/          POST /webhooks-lemonsqueezy — LS order events (public)
+    webhooks-paddle/                POST /webhooks-paddle — Paddle events (public)
   tests/
     unit/                           pure logic, no stack needed
     integration/                    §8 cases 1–21, needs local stack
@@ -110,38 +113,54 @@ The whole matrix is also scripted: `deno run -A mcp/run-matrix.ts` (from
 `supabase/`) spawns the server on its real stdio transport and runs ~57
 checks covering every scenario above end to end.
 
-## Lemon Squeezy (Phase 2)
+## Paddle (Phase 2)
 
-`POST /functions/v1/webhooks-lemonsqueezy` — public (`verify_jwt = false`);
-authentication is the `X-Signature` HMAC-SHA256 (hex, over the raw body),
-verified constant-time before anything is parsed. All LS payload knowledge
-lives in `functions/_shared/lemonsqueezy.ts` so the provider stays swappable.
+`POST /functions/v1/webhooks-paddle` — public (`verify_jwt = false`);
+authentication is the `Paddle-Signature` header (`ts=…;h1=…`, HMAC-SHA256
+over `"<ts>:<raw body>"`), verified constant-time with a 300s replay window
+before anything is parsed. All Paddle payload knowledge lives in
+`functions/_shared/paddle.ts` so the provider stays swappable (this file
+replaced `lemonsqueezy.ts` — nothing else in the license system changed).
 
-- **Idempotency**: every event inserts into `webhook_events` first with
-  `event_id = "<event>:<order_id>"`; a duplicate returns 200 and stops. If
+- **Idempotency**: every event inserts into `webhook_events` first, keyed by
+  Paddle's globally unique `event_id`; a duplicate returns 200 and stops. If
   processing fails after that insert, the event row is deleted before the 500
-  so the LS retry can reprocess.
-- **order_created** (paid only): conflict-ignoring insert on `ls_order_id`,
-  attach immediately when an account with the buyer email exists
-  (`user_id_by_email`, service-role-only SECURITY DEFINER), then the claim
-  email (Resend, best-effort — a failure never fails the webhook).
-- **order_refunded**: flips the row; arriving before order_created it CREATES
-  the row as refunded, and the late create cannot resurrect it.
-- Unknown event types and unpaid orders: stored, 200, no-op — never 4xx an
-  event we merely don't care about.
+  so the Paddle retry can reprocess.
+- **Buyer email**: Paddle transactions carry `customer_id`, not an email.
+  Resolution: stored `customer.created/updated` event → Paddle API
+  (`PADDLE_API_KEY`, `PADDLE_API_BASE_URL` for sandbox) → otherwise the event
+  is released and the handler 500s so the retry succeeds once the customer
+  event lands. A license row is never created without a normalized email —
+  auto-claim depends on it.
+- **transaction.completed**: conflict-ignoring insert on `order_id`, instant
+  attach when an account with the buyer email exists (`user_id_by_email`),
+  then the claim email (Resend, best-effort — a failure never fails the
+  webhook).
+- **Refunds arrive as `adjustment.*`** with `action: "refund"`; only
+  `status: "approved"` acts (pending approvals don't revoke). A refund
+  arriving before its purchase CREATES the row as refunded, and the late
+  purchase cannot resurrect it.
+- Unknown event types: stored, 200, no-op — never 4xx an event we merely
+  don't care about.
 - Claim email (§4): no license keys in it, the account is the license; both
   paths point at `SITE_URL` (accounts live in the desktop app).
 
-New secrets: `LS_WEBHOOK_SECRET` (from the LS webhook settings),
+New secrets: `PADDLE_WEBHOOK_SECRET` (the notification destination's
+`pdl_ntfset_…` secret), `PADDLE_API_KEY` (email fallback; recommended),
+`PADDLE_API_BASE_URL` (`https://sandbox-api.paddle.com` while in sandbox),
 `RESEND_API_KEY` (+ optional `RESEND_FROM`, `SITE_URL`; tests set
 `RESEND_BASE_URL` to a dead port to exercise the failure path).
 
-**LS dashboard checklist (manual, §5)**: product "Orchestra Lifetime" one-time
-$129 · webhook → the deployed function URL with events `order_created` +
-`order_refunded` · copy the signing secret into `LS_WEBHOOK_SECRET` · test
-mode ON until the §7 run passes: test-checkout → row + email; register with
-the buyer email → `plan: "lifetime"`; refund in dashboard → `license_refunded`;
-replay a delivery → no duplicates.
+**Paddle dashboard checklist (manual, §5)**: start in the SANDBOX
+(sandbox.paddle.com — separate free account) · product "Orchestra Lifetime",
+one-time, $129 · Developer Tools → Notifications → new destination: the
+deployed function URL, events `transaction.completed`, `customer.created`,
+`customer.updated`, `adjustment.created`, `adjustment.updated` · copy the
+secret into `PADDLE_WEBHOOK_SECRET` · API key into `PADDLE_API_KEY` ·
+§7 run: sandbox checkout → row + email; register with the buyer email →
+`plan: "lifetime"`; refund in dashboard → `license_refunded`; replay a
+delivery → no duplicates. Go-live = real Paddle account + the same three
+secrets from the live dashboard, and drop `PADDLE_API_BASE_URL`.
 
 ## Trials (Phase 1.5)
 

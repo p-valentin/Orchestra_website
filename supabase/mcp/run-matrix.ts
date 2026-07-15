@@ -90,7 +90,7 @@ const toolList = (await rpc('tools/list', {})) as { tools: Array<{ name: string 
 const names = toolList.tools.map((t) => t.name).sort()
 console.log(`tools: ${names.join(', ')}\n`)
 check(
-  ['warp_trial', 'set_license_status', 'seed_trial', 'send_ls_webhook'].every((t) => names.includes(t)),
+  ['warp_trial', 'set_license_status', 'seed_trial', 'send_paddle_webhook'].every((t) => names.includes(t)),
   'server exposes the Phase 1.5 + 2 tools',
   names,
 )
@@ -263,59 +263,76 @@ await call('set_license_status', { buyer_email: 'mx-trial@phase1.test', status: 
 const refundWins = await call('request_entitlement', { user_email: 'mx-trial@phase1.test', device_name: 'Trial-PC' })
 check(refundWins.data?.body?.error === 'license_refunded', 'refund → 403 license_refunded, never falls back to trial', refundWins.data?.body)
 
-// ---------- F. Lemon Squeezy webhooks (Phase 2) ----------
+// ---------- F. Paddle webhooks (Phase 2) ----------
 
-console.log('\n— lemon squeezy webhooks —')
-let lsOrder = Date.now()
-const orderA = String(++lsOrder)
+console.log('\n— paddle webhooks —')
+let seq = Date.now()
+const txnA = `txn_mx_${++seq}`
 
-const badSig = await call('send_ls_webhook', {
-  event_name: 'order_created', order_id: orderA, email: 'ls@phase2.test', corrupt_signature: true,
+const badSig = await call('send_paddle_webhook', {
+  event_type: 'purchase', transaction_id: txnA, email: 'pd@phase2.test', corrupt_signature: true,
 })
-check(badSig.data?.status === 401, 'corrupt signature → 401', badSig.data)
+check(badSig.data?.deliveries?.every((d: { status: number }) => d.status === 401), 'corrupt signature → 401', badSig.data)
 
-const created = await call('send_ls_webhook', {
-  event_name: 'order_created', order_id: orderA, email: '  LS-Buyer@Phase2.TEST ',
+const pdPurchase = await call('send_paddle_webhook', {
+  event_type: 'purchase', transaction_id: txnA, email: '  PD-Buyer@Phase2.TEST ',
 })
-check(created.data?.status === 200, 'order_created → 200', created.data)
-const lsLic = await call('db_rows', { table: 'licenses', buyer_email: 'ls-buyer@phase2.test' })
-check(lsLic.data?.[0]?.ls_order_id === orderA && lsLic.data?.[0]?.status === 'active', 'license row: normalized email, active', lsLic.data)
-check(lsLic.data?.[0]?.user_id === null, 'unknown email → unclaimed', lsLic.data)
+check(pdPurchase.data?.deliveries?.every((d: { status: number }) => d.status === 200), 'purchase (customer + transaction) → 200', pdPurchase.data)
+const pdLic = await call('db_rows', { table: 'licenses', buyer_email: 'pd-buyer@phase2.test' })
+check(pdLic.data?.[0]?.order_id === txnA && pdLic.data?.[0]?.status === 'active', 'license row: normalized email, active', pdLic.data)
+check(pdLic.data?.[0]?.user_id === null, 'unknown email → unclaimed', pdLic.data)
 
-const replay = await call('send_ls_webhook', {
-  event_name: 'order_created', order_id: orderA, email: 'ls-buyer@phase2.test',
+const replay = await call('send_paddle_webhook', {
+  event_type: 'transaction.completed', transaction_id: txnA, email: 'pd-buyer@phase2.test',
 })
-check(replay.data?.status === 200, 'replayed delivery → 200', replay.data)
-const lsLic2 = await call('db_rows', { table: 'licenses', buyer_email: 'ls-buyer@phase2.test' })
-check(lsLic2.data?.length === 1, 'still exactly one license row', lsLic2.data?.length)
+check(replay.data?.deliveries?.[0]?.status === 200, 'replayed transaction → 200', replay.data)
+const pdLic2 = await call('db_rows', { table: 'licenses', buyer_email: 'pd-buyer@phase2.test' })
+check(pdLic2.data?.length === 1, 'still exactly one license row', pdLic2.data?.length)
 
-const refund = await call('send_ls_webhook', { event_name: 'order_refunded', order_id: orderA })
-check(refund.data?.status === 200, 'order_refunded → 200', refund.data)
-const lsLic3 = await call('db_rows', { table: 'licenses', buyer_email: 'ls-buyer@phase2.test' })
-check(lsLic3.data?.[0]?.status === 'refunded', 'status flipped to refunded', lsLic3.data)
+const pending = await call('send_paddle_webhook', { event_type: 'refund_pending', transaction_id: txnA })
+check(pending.data?.deliveries?.[0]?.status === 200, 'pending refund adjustment → 200', pending.data)
+const pdLicPending = await call('db_rows', { table: 'licenses', buyer_email: 'pd-buyer@phase2.test' })
+check(pdLicPending.data?.[0]?.status === 'active', 'pending refund does NOT revoke', pdLicPending.data)
 
-// Out-of-order: refund lands first, late order_created cannot resurrect it.
-const orderB = String(++lsOrder)
-await call('send_ls_webhook', { event_name: 'order_refunded', order_id: orderB, email: 'ooo@phase2.test' })
-await call('send_ls_webhook', { event_name: 'order_created', order_id: orderB, email: 'ooo@phase2.test' })
-const oooRows = await call('db_rows', { table: 'licenses', buyer_email: 'ooo@phase2.test' })
-check(oooRows.data?.length === 1 && oooRows.data?.[0]?.status === 'refunded', 'refund-first stays refunded after late create', oooRows.data)
+const refund = await call('send_paddle_webhook', { event_type: 'refund', transaction_id: txnA })
+check(refund.data?.deliveries?.[0]?.status === 200, 'approved refund → 200', refund.data)
+const pdLic3 = await call('db_rows', { table: 'licenses', buyer_email: 'pd-buyer@phase2.test' })
+check(pdLic3.data?.[0]?.status === 'refunded', 'status flipped to refunded', pdLic3.data)
+
+// Out-of-order: refund lands first (creates the row with no email — no
+// customer event exists yet), late purchase cannot resurrect it.
+const txnB = `txn_mx_${++seq}`
+await call('send_paddle_webhook', { event_type: 'refund', transaction_id: txnB })
+await call('send_paddle_webhook', { event_type: 'purchase', transaction_id: txnB, email: 'ooo@phase2.test' })
+const oooRows = await call('db_rows', { table: 'licenses', order_id: txnB })
+check(oooRows.data?.length === 1 && oooRows.data?.[0]?.status === 'refunded', 'refund-first stays refunded after late purchase', oooRows.data)
 
 // Purchase attaches instantly when the account already exists.
-const orderC = String(++lsOrder)
-const lsAccount = await call('create_test_user', { email: 'mx-ls-account@phase1.test' })
-check(!lsAccount.isError, 'create account for instant attach', lsAccount.text)
-await call('send_ls_webhook', { event_name: 'order_created', order_id: orderC, email: 'MX-LS-Account@Phase1.TEST' })
-const attached = await call('db_rows', { table: 'licenses', user_email: 'mx-ls-account@phase1.test' })
-check(attached.data?.[0]?.ls_order_id === orderC && attached.data?.[0]?.claimed_at != null, 'existing account → auto-attached', attached.data)
+const txnC = `txn_mx_${++seq}`
+const pdAccount = await call('create_test_user', { email: 'mx-pd-account@phase1.test' })
+check(!pdAccount.isError, 'create account for instant attach', pdAccount.text)
+await call('send_paddle_webhook', { event_type: 'purchase', transaction_id: txnC, email: 'MX-PD-Account@Phase1.TEST' })
+const attached = await call('db_rows', { table: 'licenses', user_email: 'mx-pd-account@phase1.test' })
+check(attached.data?.[0]?.order_id === txnC && attached.data?.[0]?.claimed_at != null, 'existing account → auto-attached', attached.data)
 
-const unknownEvt = await call('send_ls_webhook', { event_name: 'affiliate_activated', order_id: String(++lsOrder) })
-check(unknownEvt.data?.status === 200, 'unknown event type → 200 no-op', unknownEvt.data)
+// Email unresolvable (no customer event, no API key): 500 + released, then
+// the retry succeeds once the customer event lands.
+const txnD = `txn_mx_${++seq}`
+const orphan = await call('send_paddle_webhook', { event_type: 'transaction.completed', transaction_id: txnD })
+check(orphan.data?.deliveries?.[0]?.status === 500, 'email unresolvable → 500 (event released for retry)', orphan.data)
+await call('send_paddle_webhook', { event_type: 'customer.created', transaction_id: txnD, email: 'late@phase2.test' })
+const retry = await call('send_paddle_webhook', { event_type: 'transaction.completed', transaction_id: txnD })
+check(retry.data?.deliveries?.[0]?.status === 200, 'retry after customer event → 200', retry.data)
+const lateLic = await call('db_rows', { table: 'licenses', buyer_email: 'late@phase2.test' })
+check(lateLic.data?.[0]?.order_id === txnD, 'license created on retry with resolved email', lateLic.data)
 
-const malformed = await call('send_ls_webhook', {
-  event_name: 'order_created', order_id: String(++lsOrder), raw_body: 'not json at all {{{',
+const unknownEvt = await call('send_paddle_webhook', { event_type: 'other', transaction_id: `txn_mx_${++seq}` })
+check(unknownEvt.data?.deliveries?.[0]?.status === 200, 'unrelated event type → 200 no-op', unknownEvt.data)
+
+const malformed = await call('send_paddle_webhook', {
+  event_type: 'transaction.completed', transaction_id: `txn_mx_${++seq}`, raw_body: 'not json at all {{{',
 })
-check(malformed.data?.status === 400, 'malformed signed body → 400', malformed.data)
+check(malformed.data?.deliveries?.[0]?.status === 400, 'malformed signed body → 400', malformed.data)
 
 // ---------- F. cleanup ----------
 
