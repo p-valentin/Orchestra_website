@@ -13,3 +13,4 @@ supabase/.temp/
 supabase/.branches/
 supabase/functions/.env.test
 supabase/tests/.keys.test.json
+supabase/keys/entitlement-private*
