@@ -94,11 +94,19 @@ Claude Code asks on next launch). It targets the local stack automatically via
 - `db_rows` — service-role reads to assert what was written
 - `cleanup_test_data` — remove everything the session created
 
+Phase 1.5 additions: `seed_trial` / `warp_trial` (reposition a trial in time —
+`days_in: 13` → capped token, `15` → expired), `set_license_status` (simulate
+the Phase 2 refund/revoke webhook), and `trials` in `db_rows`.
+
 Example flow: `setup_test_keys` → serve functions with `.env.test` →
 `create_test_user` → `seed_license` (unclaimed, same email) →
 `request_entitlement` (watch auto-claim + verified JWT) → repeat with new
 `device_name`s until `409 device_limit` → `deactivate_device` → retry →
 `cleanup_test_data`.
+
+The whole matrix is also scripted: `deno run -A mcp/run-matrix.ts` (from
+`supabase/`) spawns the server on its real stdio transport and runs ~57
+checks covering every scenario above end to end.
 
 ## Trials (Phase 1.5)
 

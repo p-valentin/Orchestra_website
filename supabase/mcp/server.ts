@@ -265,19 +265,23 @@ server.registerTool(
     const password = 'phase1-mcp-password-123!'
 
     const adm = await admin()
-    const { data: created, error: createErr } = await adm.auth.admin.createUser({
+    const { error: createErr } = await adm.auth.admin.createUser({
       email: finalEmail,
       password,
       email_confirm: true,
     })
-    if (createErr || !created.user) throw new Error(`createUser failed: ${createErr?.message}`)
+    // "already registered" is fine — a user left over from an earlier server
+    // process is adopted by signing in with the shared test password.
 
     const anon = createClient(cfg.url, cfg.anonKey, { auth: { persistSession: false } })
     const { data: session, error: signInErr } = await anon.auth.signInWithPassword({ email: finalEmail, password })
-    if (signInErr || !session.session) throw new Error(`signIn failed: ${signInErr?.message}`)
+    if (signInErr || !session.session) {
+      throw new Error(`signIn failed: ${signInErr?.message}${createErr ? ` (createUser: ${createErr.message})` : ''}`)
+    }
 
-    users.set(finalEmail, { id: created.user.id, email: finalEmail, accessToken: session.session.access_token })
-    return { user_id: created.user.id, email: finalEmail, note: 'Pass this email as user_email to the other tools.' }
+    const userId = session.session.user.id
+    users.set(finalEmail, { id: userId, email: finalEmail, accessToken: session.session.access_token })
+    return { user_id: userId, email: finalEmail, note: 'Pass this email as user_email to the other tools.' }
   }),
 )
 
@@ -509,6 +513,63 @@ server.registerTool(
     const { data, error } = await adm.from('trials').insert(row).select('*').single()
     if (error) throw new Error(`insert failed: ${error.message}`)
     return data // cleanup: cascades when cleanup_test_data deletes the user
+  }),
+)
+
+server.registerTool(
+  'set_license_status',
+  {
+    description:
+      'Update a license row’s status with the service role — simulates what the Phase 2 refund/revoke webhook will do. Filter by license_id or buyer_email.',
+    inputSchema: {
+      status: z.enum(['active', 'refunded', 'revoked']),
+      license_id: z.string().optional(),
+      buyer_email: z.string().optional(),
+    },
+  },
+  tool(async ({ status, license_id, buyer_email }: {
+    status: 'active' | 'refunded' | 'revoked'
+    license_id?: string
+    buyer_email?: string
+  }) => {
+    if (!license_id && !buyer_email) throw new Error('Pass license_id or buyer_email')
+    const adm = await admin()
+    const update = adm.from('licenses').update({ status })
+    const filtered = license_id ? update.eq('id', license_id) : update.eq('buyer_email', buyer_email!.toLowerCase().trim())
+    const { data, error } = await filtered.select('*')
+    if (error) throw new Error(error.message)
+    if (!data || data.length === 0) throw new Error('No matching license row')
+    for (const row of data) seededLicenseIds.add(row.id)
+    return data
+  }),
+)
+
+server.registerTool(
+  'warp_trial',
+  {
+    description:
+      'Reposition a user’s EXISTING trial in time (service role): days_in=13 → one day left (token exp gets capped at ends_at), days_in=15 → expired (403 trial_expired). Start trials the real way, via request_entitlement.',
+    inputSchema: {
+      user_email: z.string().describe('A user from create_test_user'),
+      days_in: z.number().describe('How many days ago the trial started'),
+    },
+  },
+  tool(async ({ user_email, days_in }: { user_email: string; days_in: number }) => {
+    const adm = await admin()
+    const user = getUser(user_email)
+    const day = 24 * 60 * 60 * 1000
+    const startedAt = new Date(Date.now() - days_in * day)
+    const { data, error } = await adm
+      .from('trials')
+      .update({
+        started_at: startedAt.toISOString(),
+        ends_at: new Date(startedAt.getTime() + 14 * day).toISOString(),
+      })
+      .eq('user_id', user.id)
+      .select('*')
+    if (error) throw new Error(error.message)
+    if (!data || data.length === 0) throw new Error('No trial row for that user — call request_entitlement first')
+    return data[0]
   }),
 )
 
