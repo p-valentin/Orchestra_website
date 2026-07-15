@@ -74,6 +74,53 @@ Deno.test('parsePaddleEvent: transaction / customer / adjustment shapes', () => 
   assertEquals(adj.adjustmentStatus, 'approved')
 })
 
+Deno.test('real sandbox payloads (captured 2026-07-15) parse as expected', () => {
+  // Verbatim shapes from Paddle's genuine sandbox deliveries — the field
+  // paths this module depends on, pinned so a Paddle change surfaces here.
+  const customerCreated = {
+    event_id: 'evt_01kxk0dqvka5fykw090fsea4e4',
+    event_type: 'customer.created',
+    notification_id: 'ntf_01kxk0dqx1abc',
+    occurred_at: '2026-07-15T13:45:55.5Z',
+    data: {
+      id: 'ctm_01kxk0dqvd7900yrqnq0rmsax8',
+      email: 'valivali10298@gmail.com',
+      status: 'active',
+      marketing_consent: false,
+    },
+  }
+  const cust = parsePaddleEvent(customerCreated)
+  assertEquals(cust.eventType, 'customer.created')
+  assertEquals(cust.entityId, 'ctm_01kxk0dqvd7900yrqnq0rmsax8')
+  assertEquals(cust.customerEmail, 'valivali10298@gmail.com')
+
+  const transactionCompleted = {
+    event_id: 'evt_01kxk0et5ja191npx37n6z37r9',
+    event_type: 'transaction.completed',
+    notification_id: 'ntf_01kxk0et6mxyz',
+    occurred_at: '2026-07-15T13:46:30.1Z',
+    data: {
+      id: 'txn_01kxk0dqx8b5kgg9gc7vc3v3wt',
+      status: 'completed',
+      customer_id: 'ctm_01kxk0dqvd7900yrqnq0rmsax8',
+      currency_code: 'USD',
+      origin: 'web',
+      invoice_id: 'inv_01kxk0erwwzmtbny6ez474bse4',
+      invoice_number: '113783-10001',
+      subscription_id: null,
+      custom_data: null,
+      details: { totals: { total: '12900', currency_code: 'USD' } },
+      items: [{ price: { id: 'pri_01kxjzv27nsc8fmvawx68d2tdf' }, quantity: 1 }],
+    },
+  }
+  const txn = parsePaddleEvent(transactionCompleted)
+  assertEquals(txn.entityId, 'txn_01kxk0dqx8b5kgg9gc7vc3v3wt')
+  assertEquals(txn.transactionStatus, 'completed')
+  assertEquals(txn.customerId, 'ctm_01kxk0dqvd7900yrqnq0rmsax8')
+  assertEquals(txn.customerEmail, null, 'transactions never carry the email')
+  assertEquals(txn.invoiceNumber, '113783-10001', 'buyer-facing support reference')
+})
+
 Deno.test('junk payload shapes degrade to nulls', () => {
   for (const junk of [null, {}, { data: 'x' }, { event_type: 42 }, []]) {
     const event = parsePaddleEvent(junk)

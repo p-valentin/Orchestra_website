@@ -73,6 +73,10 @@ export interface PaddleEvent {
   customerEmail: string | null // customer.* only, normalized
   adjustmentAction: string | null // adjustment.* only, e.g. "refund"
   adjustmentStatus: string | null // adjustment.* only, e.g. "approved"
+  // transaction.* only: Paddle's human-friendly invoice reference
+  // (e.g. "113783-10001") — what a buyer can quote to support. The txn id is
+  // machine-facing; this is the one that appears on their receipt.
+  invoiceNumber: string | null
 }
 
 // Tolerant extraction: missing fields become null and the handler decides
@@ -93,6 +97,7 @@ export function parsePaddleEvent(payload: any): PaddleEvent {
     customerEmail: isCustomer && str(data.email) ? normalizeEmail(data.email) : null,
     adjustmentAction: isAdjustment ? str(data.action) : null,
     adjustmentStatus: isAdjustment ? str(data.status) : null,
+    invoiceNumber: str(data.invoice_number),
   }
 }
 

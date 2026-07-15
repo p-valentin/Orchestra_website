@@ -6,7 +6,10 @@ const RESEND_BASE_URL = Deno.env.get('RESEND_BASE_URL') ?? 'https://api.resend.c
 const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://orchestra-automation.com'
 
 // §4: no license keys in the email — the account IS the license.
-export function claimEmailText(orderNumber: number | null): string {
+// `reference` is the provider's human-friendly order/invoice number (Paddle:
+// invoice_number, e.g. "113783-10001") — the one printed on the buyer's
+// receipt, so support can match it. Null when the provider didn't send one.
+export function claimEmailText(reference: string | null): string {
   return [
     'Thanks for buying Orchestra!',
     '',
@@ -16,11 +19,11 @@ export function claimEmailText(orderNumber: number | null): string {
     'New to Orchestra? Download the app and create your account with this',
     `email address: ${SITE_URL}/downloads`,
     '',
-    orderNumber !== null ? `Order reference (for support): #${orderNumber}` : 'Questions? Just reply to this email.',
+    reference !== null ? `Order reference (for support): ${reference}` : 'Questions? Just reply to this email.',
   ].join('\n')
 }
 
-export async function sendClaimEmail(to: string, orderNumber: number | null): Promise<boolean> {
+export async function sendClaimEmail(to: string, reference: string | null): Promise<boolean> {
   const apiKey = Deno.env.get('RESEND_API_KEY')
   if (!apiKey) {
     console.log(`[email] RESEND_API_KEY unset — claim email for ${to} not sent`)
@@ -34,7 +37,7 @@ export async function sendClaimEmail(to: string, orderNumber: number | null): Pr
         from: Deno.env.get('RESEND_FROM') ?? 'Orchestra <onboarding@resend.dev>',
         to,
         subject: 'Your Orchestra license is ready',
-        text: claimEmailText(orderNumber),
+        text: claimEmailText(reference),
       }),
     })
     if (!res.ok) {

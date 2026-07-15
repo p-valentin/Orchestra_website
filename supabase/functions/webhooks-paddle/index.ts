@@ -96,9 +96,10 @@ async function handleTransactionCompleted(supabase: SupabaseClient, event: Paddl
     }
   }
 
-  // Best-effort only (§2.4); sendClaimEmail never throws. Paddle has no
-  // human-friendly order number — support references the txn id instead.
-  await sendClaimEmail(buyerEmail, null)
+  // Best-effort only (§2.4); sendClaimEmail never throws. invoice_number is
+  // what the buyer sees on their Paddle receipt, so it's the reference
+  // support can match — falls back to the txn id if Paddle omits it.
+  await sendClaimEmail(buyerEmail, event.invoiceNumber ?? event.entityId)
 }
 
 // adjustment.* with action=refund: only "approved" acts. Out-of-order
