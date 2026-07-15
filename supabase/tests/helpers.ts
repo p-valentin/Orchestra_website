@@ -157,11 +157,52 @@ export async function signLegacyToken(
   return `${body}.${b64url(new Uint8Array(sig))}`
 }
 
+// Signs a request body the way Lemon Squeezy does: HMAC-SHA256 over the raw
+// body with the webhook signing secret, hex-encoded (X-Signature header).
+export async function signLsWebhook(secret: string, rawBody: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
+  return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Posts a raw (pre-serialized) body to the LS webhook function — raw because
+// the signature covers exact bytes, so JSON re-serialization would break it.
+export async function postLsWebhook(
+  rawBody: string,
+  opts: { signature: string; eventName?: string },
+): Promise<FnResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Signature': opts.signature,
+  }
+  if (opts.eventName) headers['X-Event-Name'] = opts.eventName
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/webhooks-lemonsqueezy`, {
+    method: 'POST',
+    headers,
+    body: rawBody,
+  })
+  const text = await res.text()
+  let body: unknown = null
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    body = { raw: text }
+  }
+  return { status: res.status, body }
+}
+
 // The signing keys `supabase functions serve` was started with, written by
 // scripts/setup-test-env.ts next to this file.
 export interface TestKeys {
   legacyPrivateKeyPkcs8B64: string
   entitlementPublicJwk: JWK
+  lsWebhookSecret: string
 }
 
 export async function loadTestKeys(): Promise<TestKeys> {
