@@ -17,3 +17,8 @@ verify_jwt = true
 
 [functions.claim-legacy]
 verify_jwt = true
+
+# Public endpoint: Lemon Squeezy can't send a Supabase JWT. Authentication is
+# the HMAC signature verified inside the function.
+[functions.webhooks-lemonsqueezy]
+verify_jwt = false
