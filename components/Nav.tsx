@@ -4,14 +4,18 @@ import { useEffect, useState } from 'react'
 import LogoMark from './LogoMark'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 
+// xlOnly: shown in the mobile menu and the footer, but dropped from the
+// desktop bar below xl — with the auth links added, everything no longer
+// fits at 1024px without wrapping.
 const LINKS = [
   { href: '/#how', label: 'How it works' },
   { href: '/#features', label: 'Features' },
   { href: '/#uses', label: 'Use cases' },
+  { href: '/#pricing', label: 'Pricing' },
   { href: '/docs', label: 'Docs' },
   { href: '/blog', label: 'Blog' },
-  { href: '/releases', label: 'Releases' },
-  { href: '/#contact', label: 'Contact' },
+  { href: '/releases', label: 'Releases', xlOnly: true },
+  { href: '/#contact', label: 'Contact', xlOnly: true },
 ]
 
 export default function Nav() {
@@ -64,12 +68,14 @@ export default function Nav() {
           <span className="font-display text-xl font-semibold tracking-tight">Orchestra</span>
         </a>
 
-        <nav className="hidden items-center gap-5 lg:flex xl:gap-8" aria-label="Primary">
+        <nav className="hidden items-center gap-4 lg:flex xl:gap-7" aria-label="Primary">
           {LINKS.map((link) => (
             <a
               key={link.label}
               href={link.href}
-              className="text-sm text-muted transition-colors hover:text-fg"
+              className={`whitespace-nowrap text-sm text-muted transition-colors hover:text-fg ${
+                link.xlOnly ? 'hidden xl:inline-block' : ''
+              }`}
             >
               {link.label}
             </a>
@@ -78,15 +84,15 @@ export default function Nav() {
 
         <div className="hidden items-center gap-4 lg:flex">
           {signedIn ? (
-            <a href="/account" className="text-sm text-muted transition-colors hover:text-fg">
+            <a href="/account" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
               Account
             </a>
           ) : (
             <>
-              <a href="/login" className="text-sm text-muted transition-colors hover:text-fg">
+              <a href="/login" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
                 Log in
               </a>
-              <a href="/signup" className="text-sm text-muted transition-colors hover:text-fg">
+              <a href="/signup" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
                 Sign up
               </a>
             </>

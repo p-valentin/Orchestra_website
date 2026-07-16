@@ -1,22 +1,22 @@
-import { getLicenseStatus } from '@/lib/licenses'
-import BetaSignup from './BetaSignup'
 import DownloadButton from './DownloadButton'
-import LicenseCounter from './LicenseCounter'
 
-export default async function DownloadCta() {
-  const { total, remaining, cutoff, closed } = await getLicenseStatus()
+export default function DownloadCta() {
   return (
     <section id="download" className="border-t border-line bg-panel/40">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
         <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
           <div>
             <h2 className="font-display text-4xl font-medium leading-[1.05] tracking-tight sm:text-5xl">
-              Free for early adopters.
-              <span className="block text-brass">Free for you, forever.</span>
+              Every download starts a
+              <span className="block text-brass">14-day free trial.</span>
             </h2>
             <p className="mt-5 max-w-md leading-relaxed text-muted">
-              Download Orchestra, claim your free license with just an email, and it stays free for
-              you forever — even after it becomes a $149 lifetime purchase. No card, no account.
+              All features, no card. Create an account, sign in inside the app, and the clock
+              starts with your first run. If Orchestra earns its keep, it&rsquo;s{' '}
+              <a href="#pricing" className="text-brass-bright underline-offset-4 hover:underline">
+                $129 once
+              </a>{' '}
+              — yours forever.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -24,12 +24,6 @@ export default async function DownloadCta() {
               <DownloadButton platform="win" arch="x64" label="Windows" />
               <DownloadButton platform="linux" arch="x64" label="Linux" />
             </div>
-
-            <div className="mt-6">
-              <LicenseCounter remaining={remaining} total={total} cutoff={cutoff} closed={closed} />
-            </div>
-
-            <BetaSignup remaining={remaining} closed={closed} />
           </div>
 
           <div className="rounded-xl border border-line bg-panel p-8 sm:p-10">

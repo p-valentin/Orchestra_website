@@ -1,12 +1,9 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rateLimit'
 import { sanitizeText, isValidEmail } from '@/lib/sanitize'
-import { recordClaim } from '@/lib/claim'
 import type { ContactState } from '@/lib/contact'
-import type { BetaState } from '@/lib/beta'
 
 async function requestIp(): Promise<string> {
   const h = await headers()
@@ -71,40 +68,4 @@ export async function submitContact(
   )
 
   return { ok: true, message: "Thanks — your message is on its way. I'll reply within a day or two.", errors: {} }
-}
-
-export async function claimBeta(_prev: BetaState, formData: FormData): Promise<BetaState> {
-  const honeypot = formData.get('company')
-  if (typeof honeypot === 'string' && honeypot.trim() !== '') {
-    return { ok: true, message: "You're locked in — Orchestra is free forever for you. Your license key will arrive by email soon." }
-  }
-
-  const limit = rateLimit('beta:' + (await requestIp()))
-  if (!limit.allowed) {
-    const mins = Math.ceil(limit.retryAfterMs / 60000)
-    return {
-      ok: false,
-      message: '',
-      error: `Too many attempts. Try again in about ${mins} minute${mins === 1 ? '' : 's'}.`,
-    }
-  }
-
-  const email = sanitizeText(formData.get('email'), 254)
-  if (!isValidEmail(email)) {
-    return { ok: false, message: '', error: "That email address doesn't look right." }
-  }
-
-  const result = await recordClaim(email, 'website')
-  if (!result.ok) {
-    if (result.reason === 'closed') {
-      return { ok: false, message: '', error: 'License claims are now closed.' }
-    }
-    return { ok: false, message: '', error: 'Something went wrong on our end — please try again in a moment.' }
-  }
-
-  revalidatePath('/')
-  revalidatePath('/downloads')
-  // The key is sent personally by the owner (recordClaim notified them), so
-  // the message promises delivery without pointing at an inbox just yet.
-  return { ok: true, message: "You're locked in — Orchestra is free forever for you. Your license key will arrive by email soon." }
 }

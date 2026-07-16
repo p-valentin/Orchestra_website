@@ -1,6 +1,6 @@
 import FlowDemo from './FlowDemo'
 
-const TRUST = ['Runs on your machine', 'No account needed', 'Exports plain Playwright', 'Free to use']
+const TRUST = ['Runs on your machine', 'Exports plain Playwright', '14-day free trial — no card', 'One-time purchase, no subscription']
 
 export default function Hero() {
   return (

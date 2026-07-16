@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: '%s',
   },
   description:
-    'Orchestra is a desktop studio for browser automation, web scraping and web RPA. Build flows visually, watch them run live, and export plain Playwright you own forever. No account, no cloud, no lock-in.',
+    'Orchestra is a desktop studio for browser automation, web scraping and web RPA. Build flows visually, watch them run live, and export plain Playwright you own forever. No cloud, no subscription, no lock-in.',
   applicationName: 'Orchestra',
   alternates: { canonical: '/' },
   keywords: [
