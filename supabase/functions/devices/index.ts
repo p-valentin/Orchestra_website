@@ -6,11 +6,13 @@
 // the token simply expires within ≤ 7 days. Accepted by design (§5.3): the
 // alternative would put a server check back into the client's hot path.
 
-import { authenticateRequest, errorResponse, json, readJsonBody, serviceClient } from '../_shared/http.ts'
+import { authenticateRequest, errorResponse, json, preflight, readJsonBody, serviceClient } from '../_shared/http.ts'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return preflight() // browser preflight from /account
+
   const supabase = serviceClient()
   const user = await authenticateRequest(req, supabase)
   if (!user) return errorResponse(401, 'unauthorized')

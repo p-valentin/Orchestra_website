@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import LogoMark from './LogoMark'
+import { supabaseBrowser } from '@/lib/supabaseBrowser'
 
 const LINKS = [
   { href: '/#how', label: 'How it works' },
@@ -16,12 +17,28 @@ const LINKS = [
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
+  // false is also the state while the session is still being read and on
+  // previews without Supabase env — the links then just point at /login and
+  // /signup, which is right for a visitor.
+  const [signedIn, setSignedIn] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    let sb
+    try {
+      sb = supabaseBrowser()
+    } catch {
+      return // no Supabase env: stay in the signed-out state
+    }
+    sb.auth.getSession().then(({ data }) => setSignedIn(!!data.session))
+    const { data: sub } = sb.auth.onAuthStateChange((_event, session) => setSignedIn(!!session))
+    return () => sub.subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
@@ -59,12 +76,28 @@ export default function Nav() {
           ))}
         </nav>
 
-        <a
-          href="/downloads"
-          className="hidden rounded-lg bg-brass px-5 py-2 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright lg:inline-block"
-        >
-          Download free
-        </a>
+        <div className="hidden items-center gap-4 lg:flex">
+          {signedIn ? (
+            <a href="/account" className="text-sm text-muted transition-colors hover:text-fg">
+              Account
+            </a>
+          ) : (
+            <>
+              <a href="/login" className="text-sm text-muted transition-colors hover:text-fg">
+                Log in
+              </a>
+              <a href="/signup" className="text-sm text-muted transition-colors hover:text-fg">
+                Sign up
+              </a>
+            </>
+          )}
+          <a
+            href="/downloads"
+            className="rounded-lg bg-brass px-5 py-2 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
+          >
+            Download free
+          </a>
+        </div>
 
         <button
           className="flex h-10 w-10 items-center justify-center lg:hidden"
@@ -83,6 +116,19 @@ export default function Nav() {
       {open && (
         <div className="fixed inset-0 top-[61px] z-40 flex flex-col gap-1 bg-bg px-6 py-8 lg:hidden">
           {LINKS.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              onClick={() => setOpen(false)}
+              className="border-b border-line py-4 font-display text-2xl font-medium tracking-tight"
+            >
+              {link.label}
+            </a>
+          ))}
+          {(signedIn ? [{ href: '/account', label: 'Account' }] : [
+            { href: '/login', label: 'Log in' },
+            { href: '/signup', label: 'Sign up' },
+          ]).map((link) => (
             <a
               key={link.label}
               href={link.href}

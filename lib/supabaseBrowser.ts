@@ -2,14 +2,15 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-// Browser-side Supabase client for the account pages (signup, password reset).
-// Only the anon key is ever exposed here — it is public by design and every
-// table is guarded by RLS; the licensing writes all happen in Edge Functions
-// with the service role.
+// Browser-side Supabase client for the account pages (signup, login, account,
+// password reset). Only the anon key is ever exposed here — it is public by
+// design and every table is guarded by RLS; the licensing writes all happen
+// in Edge Functions with the service role.
 //
 // These pages exist because the desktop app deliberately stays sign-in only:
 // registration and password reset need a browser (email confirmation links
-// have to land somewhere), so they live on the website.
+// have to land somewhere), and /account gives people a place to see their
+// license and manage device slots without opening the app.
 
 let cached: SupabaseClient | null = null
 
@@ -22,10 +23,10 @@ export function supabaseBrowser(): SupabaseClient {
   }
   cached = createClient(url, anonKey, {
     auth: {
-      // The account pages are the only place a session exists on the website,
-      // and it is short-lived (confirm / reset then done). Keeping it out of
-      // storage avoids leaving tokens in localStorage on a shared browser.
-      persistSession: false,
+      // Sessions persist so /account and the nav know who's signed in across
+      // visits. The tradeoff (tokens in localStorage on a shared browser) is
+      // the standard one for any site with a login; Sign out clears it.
+      persistSession: true,
       // Recovery/confirmation links arrive as a hash fragment; supabase-js
       // parses it into a session so updateUser() can run.
       detectSessionInUrl: true,

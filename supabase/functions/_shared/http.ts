@@ -2,10 +2,25 @@
 
 import { createClient, type SupabaseClient, type User } from 'npm:@supabase/supabase-js@2'
 
+// The website's /account page calls the devices function from the browser, so
+// responses need CORS headers. A wildcard origin is safe here: auth is a
+// bearer JWT (never cookies), so no credentialed cross-site request exists to
+// protect against.
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+}
+
+// Preflight response for browser callers; functions return it for OPTIONS.
+export function preflight(): Response {
+  return new Response(null, { status: 204, headers: corsHeaders })
+}
+
 export function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
   })
 }
 
