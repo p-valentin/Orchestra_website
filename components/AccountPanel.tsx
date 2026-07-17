@@ -71,6 +71,7 @@ export default function AccountPanel() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [deviceError, setDeviceError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<Device | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -134,8 +135,7 @@ export default function AccountPanel() {
   }
 
   async function removeDevice(device: Device) {
-    const label = device.name ?? 'this device'
-    if (!window.confirm(`Remove ${label}? Orchestra on it will stop working within 7 days, and its slot frees up right away.`)) return
+    setConfirming(null)
     setRemoving(device.id)
     setDeviceError(null)
     const { error } = await supabaseBrowser().functions.invoke('devices/deactivate', {
@@ -262,7 +262,7 @@ export default function AccountPanel() {
                   </p>
                 </div>
                 <button
-                  onClick={() => removeDevice(d)}
+                  onClick={() => setConfirming(d)}
                   disabled={removing === d.id}
                   className="shrink-0 rounded-lg border border-line-strong px-3 py-1.5 text-xs text-muted transition-colors hover:border-[#f0a8a2]/50 hover:text-[#f0a8a2] disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -275,11 +275,45 @@ export default function AccountPanel() {
         <AuthError message={deviceError} />
         {devices.length > 0 && (
           <p className="mt-3 text-xs text-faint">
-            Removing a device frees its slot immediately; Orchestra on that device stops working
-            within 7 days.
+            Removing a device frees its slot immediately, and Orchestra on that device stops working
+            the next time it&apos;s online — usually within a few minutes.
           </p>
         )}
       </Section>
+
+      {confirming && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setConfirming(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-line bg-panel p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-display text-lg font-medium">Remove {confirming.name ?? 'this device'}?</h3>
+            <p className="mt-2 text-sm text-muted">
+              Its slot frees up right away. Orchestra on that device stops working the next time it
+              connects to the internet — usually within a few minutes.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirming(null)}
+                className="rounded-lg border border-line-strong px-4 py-2 text-sm text-muted transition-colors hover:text-fg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => removeDevice(confirming)}
+                className="rounded-lg border border-[#f0a8a2]/50 px-4 py-2 text-sm font-medium text-[#f0a8a2] transition-colors hover:bg-[#f0a8a2] hover:text-[#1a1306]"
+              >
+                Remove device
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

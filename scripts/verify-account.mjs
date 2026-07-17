@@ -52,7 +52,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const consoleErrors = []
 page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()) })
 page.on('pageerror', (e) => consoleErrors.push(String(e)))
-page.on('dialog', (d) => d.accept()) // the Remove confirm()
+// A native dialog would be a regression now (removal uses a styled in-app one).
+page.on('dialog', (d) => { consoleErrors.push(`unexpected native dialog: ${d.message()}`); d.dismiss() })
 
 let userId = null
 const licenseIds = []
@@ -132,12 +133,14 @@ try {
   check((await page.getByRole('button', { name: /Buy a (new )?lifetime license/ }).count()) === 0,
     'the Buy button is hidden once the license is active')
 
-  // 8. Remove a device (confirm() auto-accepted above).
+  // 8. Remove a device via the styled confirm dialog.
   if (SKIP_DEACTIVATE) {
     console.log('  --  device removal skipped (SKIP_DEACTIVATE)')
   } else {
     const row = page.locator('li', { hasText: 'Home PC' })
     await row.locator('button', { hasText: 'Remove' }).click()
+    // A styled in-app dialog opens (no native confirm); confirm in it.
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Remove device' }).click()
     await page.waitForFunction(() => !document.body.innerText.includes('Home PC'), { timeout: 20_000 })
     check(true, 'removed device disappears from the list')
     check(/1 of 3 slots/i.test(await page.locator('main').innerText()), 'slot count drops to 1 of 3')
