@@ -97,6 +97,8 @@ try {
   check(/no license yet/i.test(freshBody), 'fresh account: "No license yet"')
   check(/not started/i.test(freshBody), 'fresh account: trial "Not started"')
   check(/0 of 3 slots/i.test(freshBody), 'fresh account: 0 of 3 device slots')
+  check((await page.locator('a', { hasText: /Buy a lifetime license/ }).count()) > 0,
+    'no-license account shows a Buy button')
 
   // 6. Nav now shows Account, not Log in.
   check((await page.locator('header a[href="/account"]').count()) > 0, 'nav shows Account when signed in')
@@ -127,6 +129,8 @@ try {
   check(/2 of 3 slots/i.test(paidBody), 'shows 2 of 3 device slots')
   check(paidBody.includes('Work MacBook') && paidBody.includes('Home PC'), 'device names listed')
   check(/macOS/.test(paidBody) && /Windows/.test(paidBody), 'platforms are labelled')
+  check((await page.locator('a', { hasText: /Buy a (new )?lifetime license/ }).count()) === 0,
+    'the Buy button is hidden once the license is active')
 
   // 8. Remove a device (confirm() auto-accepted above).
   if (SKIP_DEACTIVATE) {

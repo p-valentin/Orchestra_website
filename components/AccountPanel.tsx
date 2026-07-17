@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 import { AuthError } from '@/components/AuthShell'
+import { CHECKOUT_URL } from '@/lib/checkout'
 
 // Everything here is read via the anon client under RLS — a signed-in user
 // can only ever see their own rows. The one write (freeing a device slot)
@@ -170,6 +171,14 @@ export default function AccountPanel() {
               trial, it starts the first time you run the app.
             </p>
           </div>
+        )}
+        {!activeLicense && (
+          <a
+            href={CHECKOUT_URL}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brass px-5 py-2.5 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
+          >
+            {deadLicense ? 'Buy a new lifetime license — $129' : 'Buy a lifetime license — $129'}
+          </a>
         )}
       </Section>
 

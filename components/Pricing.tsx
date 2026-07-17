@@ -1,7 +1,8 @@
-// Pricing: one trial, one price. The buy button points at the Paddle-hosted
-// checkout (NEXT_PUBLIC_CHECKOUT_URL, set at go-live); until the env exists
-// the card still shows the price but sends people to the trial instead of a
-// dead button.
+// Pricing: one trial, one price. The buy button always renders; it points at
+// the Paddle-hosted checkout once NEXT_PUBLIC_CHECKOUT_URL is set, and falls
+// back to /signup before then (see lib/checkout).
+
+import { CHECKOUT_URL, CHECKOUT_CONFIGURED } from '@/lib/checkout'
 
 const TRIAL_POINTS = [
   'Every feature unlocked',
@@ -14,7 +15,7 @@ const LIFETIME_POINTS = [
   'Everything in the trial, forever',
   'Use it on 3 devices — move them whenever you like',
   'All future updates included',
-  'Works offline; checks in about once a week',
+  'Runs offline for up to 7 days between check-ins',
   'Exports plain Playwright code you own outright',
 ]
 
@@ -34,7 +35,6 @@ function Points({ items }: { items: string[] }) {
 }
 
 export default function Pricing() {
-  const checkoutUrl = process.env.NEXT_PUBLIC_CHECKOUT_URL
   return (
     <section id="pricing" className="border-t border-line">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
@@ -71,17 +71,15 @@ export default function Pricing() {
               <span className="text-muted">once, forever</span>
             </p>
             <Points items={LIFETIME_POINTS} />
-            {checkoutUrl ? (
-              <a
-                href={checkoutUrl}
-                className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
-              >
-                Buy Orchestra
-              </a>
-            ) : (
-              <p className="mt-8 text-sm text-muted">
-                Checkout opens at launch — start the free trial today and you can buy from inside
-                the app when the timer runs low.
+            <a
+              href={CHECKOUT_URL}
+              className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
+            >
+              Buy Orchestra — $129
+            </a>
+            {!CHECKOUT_CONFIGURED && (
+              <p className="mt-3 text-xs text-faint">
+                Checkout opens at launch — this takes you to create your account for now.
               </p>
             )}
           </div>
