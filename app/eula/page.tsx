@@ -14,15 +14,15 @@ export const metadata: Metadata = {
 // exported code owned by the user, refund → revocation via Paddle.
 
 const EULA = `
-This agreement is between you and Orchestra ([orchestra-automation.com](https://orchestra-automation.com), "we") and covers the Orchestra desktop application and its related services. Installing or using Orchestra means you accept it. If you don't accept it, don't use the software.
+This agreement is between you and Orchestra ([orchestra-automation.com](https://orchestra-automation.com), "we") and covers the Orchestra desktop application and its related services. By installing, accessing, or using Orchestra, you agree to be bound by it. If you don't accept it, don't use the software.
 
 ## The license you get
 
-When you buy Orchestra, we grant you a **lifetime, non-exclusive, non-transferable license** to install and use it for your own purposes — personal or business. Concretely:
+When you buy Orchestra, we grant you a **perpetual, non-exclusive, non-transferable license**, subject to this agreement, to install and use the current product for your own purposes — personal or business. Concretely:
 
 - **One account per person.** Your account is your license; there is no separate license key.
-- **Up to 3 devices** activated at once. You can remove a device from your account page at any time to free its slot.
-- **One payment, no subscription.** The price includes all updates for as long as Orchestra is offered.
+- **Up to 3 devices** activated at once. You can remove a device from your account page at any time to free its slot. We may adjust device-activation limits to prevent abuse while preserving reasonable personal use.
+- **One payment, no subscription.** The price includes future updates and improvements for as long as Orchestra continues to be commercially offered.
 - The license is yours, not your employer's or client's — it may not be shared, resold, rented, or pooled between people.
 
 ## The free trial
@@ -42,15 +42,15 @@ Everything you make with Orchestra is yours. We claim **no rights** over the flo
 
 ## Automation is your responsibility
 
-Orchestra automates real browsers on websites we don't control. **You** are responsible for what your automations do: respecting the terms and rate limits of the sites you automate, and complying with the laws that apply to you and to any data you collect — including privacy laws when scraping personal data. We provide the instrument; you conduct.
+Orchestra automates real browsers on websites we don't control. **You** are responsible for what your automations do: respecting the terms and rate limits of the sites you automate, and complying with the laws that apply to you and to any data you collect — including privacy laws when scraping personal data. You are solely responsible for obtaining any permission required for the websites or services you automate. We provide the instrument; you conduct.
 
 ## Buying, taxes, refunds
 
-Orchestra is sold through **Paddle**, our merchant of record — Paddle is the seller of record for your purchase and their buyer terms apply at checkout. Prices are in USD; any tax is calculated and added by Paddle at checkout. Refunds are handled through Paddle. **A refunded or charged-back purchase deactivates its license.**
+Orchestra is sold through **Paddle**, our merchant of record — Paddle is the seller of record for your purchase and their buyer terms apply at checkout. Prices are in USD; any tax is calculated and added by Paddle at checkout. Refunds are handled through Paddle, and refund eligibility is determined by Paddle's applicable policies. **A refunded or charged-back purchase deactivates its license.**
 
 ## Staying licensed
 
-The app confirms your license with our servers when you sign in and roughly once a week afterwards; between check-ins it runs fully offline. We may revoke a license obtained fraudulently or used in breach of this agreement. We intend to keep the license service running for as long as Orchestra is offered; if we ever discontinue it, we will provide a reasonable path for licensed copies to keep working.
+The app confirms your license with our servers when you sign in and roughly once a week afterwards; between check-ins it runs fully offline. We may revoke a license obtained fraudulently or used in breach of this agreement. If we ever permanently discontinue the license service, we will make commercially reasonable efforts to provide a way for licensed users to keep using the software.
 
 ## No warranty
 
@@ -62,11 +62,27 @@ To the extent the law allows, our total liability under this agreement is capped
 
 ## Ending this agreement
 
-If you materially breach this agreement, your license ends. You can end it yourself at any time by deleting your account. The sections on your ownership of exported work, warranty, and liability survive.
+If you materially breach this agreement, your license ends and you must stop using the software. You can end this agreement yourself at any time by deleting your account. The sections on your ownership of exported work, warranty, and liability survive.
+
+## Third-party and open-source software
+
+Orchestra includes third-party open-source components, each governed by its own license; those licenses continue to apply to those components.
+
+## Export and sanctions
+
+You may not use Orchestra in violation of applicable export-control laws or sanctions, or in any country or by any party that such laws prohibit.
+
+## Events outside our control
+
+We aren't liable for any failure or delay caused by events beyond our reasonable control — including outages at our infrastructure providers, network failures, or other force-majeure events.
+
+## The whole agreement
+
+This is the entire agreement between you and us about Orchestra, and it replaces any earlier understanding. If any part is found unenforceable, the rest stays in force.
 
 ## Changes and contact
 
-We may update this agreement for future versions of Orchestra; material changes will be announced on this page and the date below updated. This agreement is governed by the laws of Romania, without affecting mandatory consumer protections of the country you live in. Questions: [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
+We may update this agreement for future versions of Orchestra; material changes will be announced on this page and the date below updated. Material changes apply going forward and do not retroactively remove rights already granted, unless the law requires otherwise. This agreement is governed by the laws of Romania, without affecting mandatory consumer protections of the country you live in. Questions: [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
 `
 
 export default function EulaPage() {
