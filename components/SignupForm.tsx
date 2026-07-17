@@ -66,19 +66,6 @@ export default function SignupForm() {
     }
   }
 
-  if (existing) {
-    return (
-      <div className="space-y-4">
-        <AuthNote>That email already has an Orchestra account.</AuthNote>
-        <p className="text-sm text-muted">
-          <AuthLink href="/login">Sign in</AuthLink> instead, or{' '}
-          <AuthLink href="/forgot-password">reset your password</AuthLink> if you&apos;ve forgotten it.
-          Any license you bought with this email is already attached.
-        </p>
-      </div>
-    )
-  }
-
   if (sentTo) {
     return (
       <div className="space-y-4">
@@ -106,7 +93,15 @@ export default function SignupForm() {
         placeholder="At least 8 characters"
       />
       <AuthButton pending={pending}>{pending ? 'Creating account…' : 'Create account'}</AuthButton>
-      <AuthError message={error} />
+      {existing ? (
+        <p role="alert" className="mt-3 rounded-lg border border-[#f0a8a2]/30 bg-[#f0a8a2]/10 px-4 py-2.5 text-sm text-[#f0a8a2]">
+          That email already has an account.{' '}
+          <a href="/login" className="font-medium underline underline-offset-2">Log in</a> or{' '}
+          <a href="/forgot-password" className="underline underline-offset-2">reset your password</a>.
+        </p>
+      ) : (
+        <AuthError message={error} />
+      )}
     </form>
   )
 }

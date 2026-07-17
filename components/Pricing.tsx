@@ -2,7 +2,8 @@
 // the Paddle-hosted checkout once NEXT_PUBLIC_CHECKOUT_URL is set, and falls
 // back to /login before then (see lib/checkout).
 
-import { CHECKOUT_URL, CHECKOUT_CONFIGURED } from '@/lib/checkout'
+import { CHECKOUT_CONFIGURED } from '@/lib/checkout'
+import BuyButton from '@/components/BuyButton'
 
 const TRIAL_POINTS = [
   'Every feature unlocked',
@@ -71,16 +72,11 @@ export default function Pricing() {
               <span className="text-muted">once, forever</span>
             </p>
             <Points items={LIFETIME_POINTS} />
-            <a
-              href={CHECKOUT_URL}
-              className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
-            >
+            <BuyButton className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright">
               Buy Orchestra — $129
-            </a>
+            </BuyButton>
             {!CHECKOUT_CONFIGURED && (
-              <p className="mt-3 text-xs text-faint">
-                Checkout opens at launch — this takes you to sign in for now.
-              </p>
+              <p className="mt-3 text-xs text-faint">Checkout opens at launch.</p>
             )}
           </div>
         </div>

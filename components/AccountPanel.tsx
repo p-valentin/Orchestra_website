@@ -3,7 +3,21 @@
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 import { AuthError } from '@/components/AuthShell'
-import { CHECKOUT_URL } from '@/lib/checkout'
+import BuyButton from '@/components/BuyButton'
+
+// Postgres/PostgREST speak in codes like "JWT issued at future"; buyers should
+// never see those. Map the ones worth distinguishing to plain language; the
+// rest become a calm generic line.
+function friendlyLoadError(raw: string): string {
+  const m = raw.toLowerCase()
+  if (m.includes('jwt') || m.includes('token')) {
+    if (m.includes('future') || m.includes('issued at')) {
+      return 'Your device’s clock looks off, so we couldn’t verify your account. Turn on automatic date & time, then refresh.'
+    }
+    return 'Your session needs a refresh — reload the page and you’re back in.'
+  }
+  return 'We couldn’t load your account just now — refresh to try again.'
+}
 
 // Everything here is read via the anon client under RLS — a signed-in user
 // can only ever see their own rows. The one write (freeing a device slot)
@@ -60,6 +74,17 @@ export default function AccountPanel() {
 
   useEffect(() => {
     let cancelled = false
+    const load = (sb: ReturnType<typeof supabaseBrowser>) =>
+      Promise.all([
+        sb.from('licenses').select('status, plan, purchased_at').order('purchased_at', { ascending: false }),
+        sb.from('trials').select('started_at, ends_at').maybeSingle(),
+        sb
+          .from('devices')
+          .select('id, name, platform, app_version, last_seen_at')
+          .is('revoked_at', null)
+          .order('last_seen_at', { ascending: false }),
+      ])
+
     ;(async () => {
       const sb = supabaseBrowser()
       const { data } = await sb.auth.getSession()
@@ -70,25 +95,29 @@ export default function AccountPanel() {
       if (cancelled) return
       setEmail(data.session.user.email ?? null)
 
-      const [lic, tri, dev] = await Promise.all([
-        sb.from('licenses').select('status, plan, purchased_at').order('purchased_at', { ascending: false }),
-        sb.from('trials').select('started_at, ends_at').maybeSingle(),
-        sb
-          .from('devices')
-          .select('id, name, platform, app_version, last_seen_at')
-          .is('revoked_at', null)
-          .order('last_seen_at', { ascending: false }),
-      ])
+      let [lic, tri, dev] = await load(sb)
+      let failed = lic.error ?? tri.error ?? dev.error
+      // A stale or clock-skewed token can make PostgREST reject the read
+      // ("JWT ..."). Mint a fresh one and retry once before giving up — this
+      // clears a token whose timestamp drifted (e.g. after a laptop sleep or
+      // over a VPN) without bothering the user.
+      if (failed && /jwt|token/i.test(failed.message)) {
+        const { data: refreshed } = await sb.auth.refreshSession()
+        if (cancelled) return
+        if (refreshed?.session) {
+          ;[lic, tri, dev] = await load(sb)
+          failed = lic.error ?? tri.error ?? dev.error
+        }
+      }
       if (cancelled) return
-      const failed = lic.error ?? tri.error ?? dev.error
-      if (failed) setLoadError(`Couldn’t load your account data (${failed.message}). Refresh to try again.`)
+      if (failed) setLoadError(friendlyLoadError(failed.message))
       setLicenses(lic.data ?? [])
       setTrial(tri.data ?? null)
       setDevices(dev.data ?? [])
       setLoading(false)
-    })().catch((err) => {
+    })().catch(() => {
       if (!cancelled) {
-        setLoadError(err instanceof Error ? err.message : 'Something went wrong — refresh to try again.')
+        setLoadError('We couldn’t load your account just now — refresh to try again.')
         setLoading(false)
       }
     })
@@ -173,12 +202,9 @@ export default function AccountPanel() {
           </div>
         )}
         {!activeLicense && (
-          <a
-            href={CHECKOUT_URL}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brass px-5 py-2.5 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
-          >
+          <BuyButton className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brass px-5 py-2.5 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright">
             {deadLicense ? 'Buy a new lifetime license — $129' : 'Buy a lifetime license — $129'}
-          </a>
+          </BuyButton>
         )}
       </Section>
 
