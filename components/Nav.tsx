@@ -4,18 +4,19 @@ import { useEffect, useState } from 'react'
 import LogoMark from './LogoMark'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
 
-// xlOnly: shown in the mobile menu and the footer, but dropped from the
-// desktop bar below xl — with the auth links added, everything no longer
-// fits at 1024px without wrapping.
+// `primary` links show in the desktop bar; every link shows in the mobile
+// menu. Keeping the desktop bar to four essentials (plus auth + download)
+// leaves it uncluttered — the homepage-section links and secondary pages
+// still live in the mobile menu and the footer.
 const LINKS = [
   { href: '/#how', label: 'How it works' },
-  { href: '/#features', label: 'Features' },
+  { href: '/#features', label: 'Features', primary: true },
   { href: '/#uses', label: 'Use cases' },
-  { href: '/#pricing', label: 'Pricing' },
-  { href: '/docs', label: 'Docs' },
-  { href: '/blog', label: 'Blog' },
-  { href: '/releases', label: 'Releases', xlOnly: true },
-  { href: '/#contact', label: 'Contact', xlOnly: true },
+  { href: '/#pricing', label: 'Pricing', primary: true },
+  { href: '/docs', label: 'Docs', primary: true },
+  { href: '/blog', label: 'Blog', primary: true },
+  { href: '/releases', label: 'Releases' },
+  { href: '/#contact', label: 'Contact' },
 ]
 
 export default function Nav() {
@@ -68,14 +69,12 @@ export default function Nav() {
           <span className="font-display text-xl font-semibold tracking-tight">Orchestra</span>
         </a>
 
-        <nav className="hidden items-center gap-4 lg:flex xl:gap-7" aria-label="Primary">
-          {LINKS.map((link) => (
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary">
+          {LINKS.filter((link) => link.primary).map((link) => (
             <a
               key={link.label}
               href={link.href}
-              className={`whitespace-nowrap text-sm text-muted transition-colors hover:text-fg ${
-                link.xlOnly ? 'hidden xl:inline-block' : ''
-              }`}
+              className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg"
             >
               {link.label}
             </a>
