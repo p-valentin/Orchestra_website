@@ -83,40 +83,49 @@ async function handleTransactionCompleted(supabase: SupabaseClient, event: Paddl
   if (readErr) throw readErr
   if (license.status !== 'active') return // pre-existing refunded row: no attach, no email
 
+  let attachedUserId: string | null = license.user_id
   if (license.user_id === null) {
     // Prefer the account that actually clicked Buy (custom_data.user_id), so a
     // buyer who changes the email in Paddle still gets the license on THEIR
     // account. Fall back to matching the buyer email (buy-before-signup, or a
     // purchase made outside our checkout). A bogus user_id can't attach: the
     // FK to auth.users rejects it, and we retry via email.
-    let attached = false
+    const now = new Date().toISOString()
     if (event.customUserId) {
       const { error: byIdErr } = await supabase
         .from('licenses')
-        .update({ user_id: event.customUserId, claimed_at: new Date().toISOString() })
+        .update({ user_id: event.customUserId, claimed_at: now })
         .eq('id', license.id)
         .is('user_id', null)
-      attached = !byIdErr
       if (byIdErr) console.error('attach by custom user_id failed, will try email:', byIdErr.message)
+      else attachedUserId = event.customUserId
     }
-    if (!attached) {
+    if (attachedUserId === null) {
       const { data: userId, error: lookupErr } = await supabase.rpc('user_id_by_email', { p_email: buyerEmail })
       if (lookupErr) throw lookupErr
       if (userId) {
         const { error: attachErr } = await supabase
           .from('licenses')
-          .update({ user_id: userId, claimed_at: new Date().toISOString() })
+          .update({ user_id: userId, claimed_at: now })
           .eq('id', license.id)
           .is('user_id', null)
         if (attachErr) throw attachErr
+        attachedUserId = userId
       }
     }
   }
 
-  // Best-effort only (§2.4); sendClaimEmail never throws. invoice_number is
-  // what the buyer sees on their Paddle receipt, so it's the reference
-  // support can match — falls back to the txn id if Paddle omits it.
-  await sendClaimEmail(buyerEmail, event.invoiceNumber ?? event.entityId)
+  // The confirmation email goes to the ACCOUNT's own address whenever the
+  // purchase is bound to an account — only Paddle's invoice goes to the
+  // (editable) paying email. With no account yet (buy-before-signup) it falls
+  // back to the buyer email, where the two are the same anyway. Best-effort
+  // (§2.4); sendClaimEmail never throws.
+  let confirmationEmail = buyerEmail
+  if (attachedUserId) {
+    const { data: acct, error: acctErr } = await supabase.auth.admin.getUserById(attachedUserId)
+    if (!acctErr && acct?.user?.email) confirmationEmail = acct.user.email
+  }
+  await sendClaimEmail(confirmationEmail, event.invoiceNumber ?? event.entityId)
 }
 
 // adjustment.* with action=refund: only "approved" acts. Out-of-order
