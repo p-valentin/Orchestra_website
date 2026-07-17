@@ -10,7 +10,7 @@ import { AuthField, AuthButton, AuthError, AuthNote, AuthLink } from '@/componen
 function friendlyError(message: string): string {
   const m = message.toLowerCase()
   if (m.includes('already registered') || m.includes('already been registered')) {
-    return 'That email already has an account — sign in inside Orchestra, or reset your password.'
+    return 'That email already has an account — sign in, or reset your password.'
   }
   if (m.includes('password')) return 'Password needs to be at least 8 characters.'
   if (m.includes('invalid') && m.includes('email')) return "That email doesn't look right — check it and try again."
@@ -22,11 +22,13 @@ export default function SignupForm() {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sentTo, setSentTo] = useState<string | null>(null)
+  const [existing, setExisting] = useState(false)
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setPending(true)
     setError(null)
+    setExisting(false)
 
     const form = new FormData(e.currentTarget)
     const email = String(form.get('email') ?? '').trim().toLowerCase()
@@ -41,18 +43,40 @@ export default function SignupForm() {
     }
 
     try {
-      const { error } = await supabaseBrowser().auth.signUp({
+      const { data, error } = await supabaseBrowser().auth.signUp({
         email,
         password,
         options: { emailRedirectTo: authRedirectTo('/welcome') },
       })
-      if (error) setError(friendlyError(error.message))
-      else setSentTo(email)
+      if (error) {
+        setError(friendlyError(error.message))
+      } else if (data.user && (data.user.identities?.length ?? 0) === 0) {
+        // Supabase's anti-enumeration signal: with email confirmation on, a
+        // sign-up for an address that ALREADY has an account returns no error
+        // and an empty identities array (no email is sent). Without this check
+        // the form would falsely say "check your inbox" and no mail arrives.
+        setExisting(true)
+      } else {
+        setSentTo(email)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong — try again.')
     } finally {
       setPending(false)
     }
+  }
+
+  if (existing) {
+    return (
+      <div className="space-y-4">
+        <AuthNote>That email already has an Orchestra account.</AuthNote>
+        <p className="text-sm text-muted">
+          <AuthLink href="/login">Sign in</AuthLink> instead, or{' '}
+          <AuthLink href="/forgot-password">reset your password</AuthLink> if you&apos;ve forgotten it.
+          Any license you bought with this email is already attached.
+        </p>
+      </div>
+    )
   }
 
   if (sentTo) {
