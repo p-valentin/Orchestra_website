@@ -151,12 +151,21 @@ interface DeviceFields {
   appVersion: string | null
 }
 
+// 'activate' is a user-initiated acquire (sign-in, or the modal retry after
+// freeing a slot): it may reactivate a revoked device or create a new one.
+// 'refresh' is the app's background heartbeat while online: it only re-validates
+// an already-active device and NEVER resurrects a removed one — so deactivating
+// a device kills it on its next check-in instead of after the token's 7-day
+// grace. The grace only ever covers being offline, not being removed.
+export type EntitlementMode = 'activate' | 'refresh'
+
 // Upserts the device on (user_id, fingerprint_hash) within the 3-slot limit.
 // Returns the device id or the 409 response listing the active devices.
 async function upsertDevice(
   supabase: SupabaseClient,
   user: User,
   fields: DeviceFields,
+  mode: EntitlementMode,
 ): Promise<{ deviceId: string } | { error: Response }> {
   const now = new Date().toISOString()
   const { data: existing, error: findErr } = await supabase
@@ -174,6 +183,13 @@ async function upsertDevice(
       .eq('id', existing.id)
     if (error) throw error
     return { deviceId: existing.id }
+  }
+
+  // Past here the device is revoked or brand-new. A background refresh must not
+  // resurrect it or take a slot: a removed device stops working the instant it
+  // reaches the server again, with no offline-grace carryover.
+  if (mode === 'refresh') {
+    return { error: errorResponse(403, 'device_revoked') }
   }
 
   // New activation (fresh fingerprint, or a previously revoked device coming
@@ -228,6 +244,9 @@ Deno.serve(async (req) => {
   const platform = typeof body?.platform === 'string' && PLATFORMS.has(body.platform) ? body.platform : null
   const name = typeof body?.device_name === 'string' ? body.device_name.slice(0, 120) : null
   const appVersion = typeof body?.app_version === 'string' ? body.app_version.slice(0, 40) : null
+  // Default to 'activate' so any older client (which sends no mode) keeps its
+  // current behaviour; only the app's background heartbeat opts into 'refresh'.
+  const mode: EntitlementMode = body?.mode === 'refresh' ? 'refresh' : 'activate'
 
   try {
     const resolved = await resolveLicense(supabase, user)
@@ -249,7 +268,7 @@ Deno.serve(async (req) => {
       notAfter = trialEndsAt
     }
 
-    const device = await upsertDevice(supabase, user, { fingerprint, name, platform, appVersion })
+    const device = await upsertDevice(supabase, user, { fingerprint, name, platform, appVersion }, mode)
     if ('error' in device) return device.error
 
     const { token, expiresAt } = await signEntitlementToken(await privateKeyPromise, {

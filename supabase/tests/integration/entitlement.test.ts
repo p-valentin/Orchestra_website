@@ -312,3 +312,72 @@ Deno.test('9. missing or invalid auth JWT → 401', async () => {
   })
   assertEquals(badAuth.status, 401)
 })
+
+// The online heartbeat: mode='refresh' re-validates an active device but must
+// NEVER resurrect a removed one — that is what makes deactivation bite within
+// minutes instead of after the token's 7-day grace.
+Deno.test('refresh mode: an active device re-validates → 200, no extra slot consumed', async () => {
+  const email = uniqueEmail('entrefA')
+  const user = await createTestUser(email)
+  const licenseId = await seedLicense({ buyer_email: email, user_id: user.id })
+  const fp = randomFingerprint()
+  try {
+    const act = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(fp) })
+    assertEquals(act.status, 200)
+
+    const refresh = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(fp, { mode: 'refresh' }) })
+    assertEquals(refresh.status, 200)
+    assertExists(refresh.body.token)
+
+    const { data: active } = await admin.from('devices').select('id').eq('user_id', user.id).is('revoked_at', null)
+    assertEquals(active!.length, 1, 'refresh must not create a second device')
+  } finally {
+    await cleanup([user.id], [licenseId])
+  }
+})
+
+Deno.test('refresh mode: a removed device is refused (device_revoked) and NOT reactivated', async () => {
+  const email = uniqueEmail('entrefB')
+  const user = await createTestUser(email)
+  const licenseId = await seedLicense({ buyer_email: email, user_id: user.id })
+  const fp = randomFingerprint()
+  try {
+    await callFn('entitlement', { token: user.accessToken, body: entitlementBody(fp) }) // activate
+    const { data: dev } = await admin
+      .from('devices').select('id').eq('user_id', user.id).eq('fingerprint_hash', fp).single()
+    await admin.from('devices').update({ revoked_at: new Date().toISOString() }).eq('id', dev!.id)
+
+    // The heartbeat lands: a removed device is refused, immediately.
+    const refresh = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(fp, { mode: 'refresh' }) })
+    assertEquals(refresh.status, 403)
+    assertEquals(refresh.body.error, 'device_revoked')
+
+    // It must still be revoked — the refresh did not resurrect it.
+    const { data: after } = await admin.from('devices').select('revoked_at').eq('id', dev!.id).single()
+    assert(after!.revoked_at !== null, 'refresh must not reactivate a removed device')
+
+    // But a user-initiated activate CAN bring it back (that is the recovery path).
+    const react = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(fp) })
+    assertEquals(react.status, 200)
+    const { data: back } = await admin.from('devices').select('revoked_at').eq('id', dev!.id).single()
+    assertEquals(back!.revoked_at, null)
+  } finally {
+    await cleanup([user.id], [licenseId])
+  }
+})
+
+Deno.test('refresh mode: a brand-new device is refused, never silently activated', async () => {
+  const email = uniqueEmail('entrefC')
+  const user = await createTestUser(email)
+  const licenseId = await seedLicense({ buyer_email: email, user_id: user.id })
+  try {
+    const refresh = await callFn('entitlement', { token: user.accessToken, body: entitlementBody(randomFingerprint(), { mode: 'refresh' }) })
+    assertEquals(refresh.status, 403)
+    assertEquals(refresh.body.error, 'device_revoked')
+
+    const { data: devs } = await admin.from('devices').select('id').eq('user_id', user.id)
+    assertEquals(devs!.length, 0, 'refresh must not create a device')
+  } finally {
+    await cleanup([user.id], [licenseId])
+  }
+})
