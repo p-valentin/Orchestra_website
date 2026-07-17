@@ -23,17 +23,17 @@ Orchestra is operated from Romania, and we are the data controller for the infor
 
 ## The short version
 
-We collect what running a licensed product requires — your email, your license and device records, crash reports — and nothing aimed at tracking you. No advertising, no selling data, no analytics cookies. Payments are handled by our payments provider; your card details never reach us.
+We collect what running a licensed product requires — your email, your license and device records, crash reports — and nothing aimed at tracking you. No advertising, no selling data, no analytics cookies. Payments are processed by Paddle; your card details never reach us.
 
 ## Your account
 
-Creating an account stores your **email address** and a **hashed password** (we never see or store the plain password). Accounts live with our database and authentication provider, hosted in the **EU**. Confirmation and password-reset emails are sent through our email provider.
+Creating an account stores your **email address** and a **hashed password** (we never see or store the plain password). Accounts live in Supabase, our database and authentication provider, hosted in the **EU (Frankfurt)**. Confirmation and password-reset emails are sent through Resend.
 
 We use your account to attach your purchase, your trial, and your devices to you — the account *is* the license. Legal basis: performance of a contract.
 
 ## Purchases
 
-Checkout is operated by our payments provider, acting as the **merchant of record** — the seller you buy from. Your card or payment details go to them and never touch our servers. From each purchase we receive your **email address**, an **order reference**, and the **transaction status** (paid, refunded), which is what we need to create and maintain your license. Legal basis: performance of a contract.
+Checkout is operated by **Paddle**, our merchant of record — the seller you buy from. Your card or payment details go to Paddle and never touch our servers. From each purchase we receive your **email address**, an **order reference**, and the **transaction status** (paid, refunded), which is what we need to create and maintain your license. Legal basis: performance of a contract.
 
 ## Licenses, trials, and devices
 
@@ -51,17 +51,28 @@ The app periodically asks \`downloads.orchestra-automation.com\` whether a newer
 
 ## Crash reports
 
-When the app crashes or hits an internal error, a report goes to our crash-reporting provider: the stack trace, app version, and operating system. Reporting is configured **not** to attach IP addresses or user identifiers, and it does not include the contents of your flows. Crash reporting is on by default in current builds; an in-app switch to turn it off is planned. Until it ships, write to us and we'll help you disable it. Legal basis: legitimate interest in fixing bugs.
+When the app crashes or hits an internal error, a report goes to **Sentry**: the stack trace, app version, and operating system. Reporting is configured **not** to attach IP addresses or user identifiers, and it does not include the contents of your flows. Crash reporting is on by default in current builds; an in-app switch to turn it off is planned. Until it ships, write to us and we'll help you disable it. Legal basis: legitimate interest in fixing bugs.
 
 ## This website
 
-Analytics here are **cookieless**: a first-party counter records which page was viewed and, on your first page only, the domain you arrived from — no identifiers, no cookies, nothing tied to you. Our hosting provider additionally reports aggregate, anonymized traffic. Signing in on the site keeps a session token in your browser's local storage until you sign out; we set no advertising or analytics cookies.
+Analytics here are **cookieless**: a first-party counter records which page was viewed and, on your first page only, the domain you arrived from — no identifiers, no cookies, nothing tied to you. Vercel, our hosting provider, additionally reports aggregate, anonymized traffic. Signing in on the site keeps a session token in your browser's local storage until you sign out; we set no advertising or analytics cookies.
 
 If you use the contact form or send feedback from the app, we receive what you wrote, your email if you provide it, and — for in-app bug reports — the diagnostic log attached to the report. It goes to our inbox and is kept only as long as the conversation needs.
 
 ## Service providers
 
-We rely on a small number of trusted providers to run Orchestra — for hosting, our database, payments, email, and crash reporting. They process data only as needed to provide their service, never for their own purposes. Providers outside the EU rely on Standard Contractual Clauses approved by the European Commission, together with data-processing agreements.
+We rely on a small number of trusted providers to run Orchestra. They process data only as needed to provide their service, never for their own purposes:
+
+| Provider | Role | Where |
+| --- | --- | --- |
+| Supabase | Accounts, license database, license server | EU (Frankfurt) |
+| Paddle | Merchant of record — payments, tax, refunds | UK/EU/US |
+| Resend | Transactional email | US |
+| Sentry | Crash reports | US |
+| Vercel | Website hosting and aggregate analytics | Global edge |
+| Cloudflare | App downloads and update checks | Global edge |
+
+Providers outside the EU rely on Standard Contractual Clauses approved by the European Commission, together with data-processing agreements.
 
 ## Security
 
@@ -81,6 +92,10 @@ If you're in the EU/UK (and in spirit, wherever you are): you can ask for a copy
 ## Legal requests
 
 We may disclose information where the law requires it — for example, in response to a valid order from a court or public authority.
+
+## Children
+
+Orchestra isn't intended for children under 16, and we don't knowingly collect their data.
 
 ## Changes
 
