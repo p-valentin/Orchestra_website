@@ -1,6 +1,6 @@
 // Pricing: one trial, one price. The buy button always renders; it points at
 // the Paddle-hosted checkout once NEXT_PUBLIC_CHECKOUT_URL is set, and falls
-// back to /signup before then (see lib/checkout).
+// back to /login before then (see lib/checkout).
 
 import { CHECKOUT_URL, CHECKOUT_CONFIGURED } from '@/lib/checkout'
 
@@ -79,7 +79,7 @@ export default function Pricing() {
             </a>
             {!CHECKOUT_CONFIGURED && (
               <p className="mt-3 text-xs text-faint">
-                Checkout opens at launch — this takes you to create your account for now.
+                Checkout opens at launch — this takes you to sign in for now.
               </p>
             )}
           </div>
