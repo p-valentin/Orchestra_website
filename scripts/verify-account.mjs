@@ -149,13 +149,41 @@ try {
     check(!!revoked?.revoked_at, 'revoked_at is set in the database', revoked)
   }
 
+  // 8b. Change password: wrong current password → inline error; the real one
+  // → success note; and afterwards only the NEW password signs in.
+  const NEW_PASSWORD = `${PASSWORD}-rotated`
+  const pwForm = page.locator('form', { hasText: 'Current password' })
+  check((await pwForm.count()) === 1, 'account page has a change-password form')
+  await pwForm.locator('input[name="current_password"]').fill('not-my-password')
+  await pwForm.locator('input[name="new_password"]').fill(NEW_PASSWORD)
+  await pwForm.getByRole('button', { name: 'Update password' }).click()
+  await pwForm.locator('p[role="alert"]').waitFor({ timeout: 20_000 })
+  check(/current password is incorrect/i.test(await pwForm.locator('p[role="alert"]').innerText()),
+    'wrong current password → inline error')
+  await pwForm.locator('input[name="current_password"]').fill(PASSWORD)
+  await pwForm.locator('input[name="new_password"]').fill(NEW_PASSWORD)
+  await pwForm.getByRole('button', { name: 'Update password' }).click()
+  await pwForm.locator('p[role="status"]').waitFor({ timeout: 20_000 })
+  check(/password updated/i.test(await pwForm.locator('p[role="status"]').innerText()),
+    'correct current password → "Password updated"')
+  check((await page.getByRole('button', { name: 'Sign out everywhere' }).count()) > 0,
+    'Sign out everywhere action is present')
+
   // 9. Sign out: back to the landing page, nav flips back, /account bounces.
-  await page.click('button:has-text("Sign out")')
+  // (exact: the Security section adds a "Sign out everywhere" button too)
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await page.waitForURL(`${SITE}/`, { timeout: 20_000 })
   check((await page.locator('header a[href="/login"]').count()) > 0, 'after sign-out the nav shows Log in again')
   await page.goto(`${SITE}/account`, { waitUntil: 'networkidle' })
   await page.waitForURL('**/login', { timeout: 10_000 }).catch(() => {})
   check(page.url().includes('/login'), 'after sign-out /account redirects to /login')
+
+  // 9b. The rotated password is the one that works now.
+  await page.fill('input[name="email"]', EMAIL)
+  await page.fill('input[name="password"]', NEW_PASSWORD)
+  await page.click('button[type="submit"]')
+  await page.waitForURL('**/account', { timeout: 20_000 })
+  check(page.url().includes('/account'), 'the new password signs in after the change')
 
   const realErrors = consoleErrors.filter((e) =>
     !/eval\(\) is not supported/.test(e) && !/va\.vercel-scripts\.com/.test(e) &&
