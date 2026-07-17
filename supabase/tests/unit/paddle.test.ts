@@ -119,6 +119,15 @@ Deno.test('real sandbox payloads (captured 2026-07-15) parse as expected', () =>
   assertEquals(txn.customerId, 'ctm_01kxk0dqvd7900yrqnq0rmsax8')
   assertEquals(txn.customerEmail, null, 'transactions never carry the email')
   assertEquals(txn.invoiceNumber, '113783-10001', 'buyer-facing support reference')
+  assertEquals(txn.customUserId, null, 'no custom_data → null')
+
+  // A checkout opened for a signed-in buyer carries their account id, which
+  // binds the license regardless of the email they typed into Paddle.
+  const withCustom = parsePaddleEvent({
+    ...transactionCompleted,
+    data: { ...transactionCompleted.data, custom_data: { user_id: '3a1c740c-0651-4b65-b9d5-d5fa8f4efb28' } },
+  })
+  assertEquals(withCustom.customUserId, '3a1c740c-0651-4b65-b9d5-d5fa8f4efb28')
 })
 
 Deno.test('junk payload shapes degrade to nulls', () => {

@@ -84,15 +84,32 @@ async function handleTransactionCompleted(supabase: SupabaseClient, event: Paddl
   if (license.status !== 'active') return // pre-existing refunded row: no attach, no email
 
   if (license.user_id === null) {
-    const { data: userId, error: lookupErr } = await supabase.rpc('user_id_by_email', { p_email: buyerEmail })
-    if (lookupErr) throw lookupErr
-    if (userId) {
-      const { error: attachErr } = await supabase
+    // Prefer the account that actually clicked Buy (custom_data.user_id), so a
+    // buyer who changes the email in Paddle still gets the license on THEIR
+    // account. Fall back to matching the buyer email (buy-before-signup, or a
+    // purchase made outside our checkout). A bogus user_id can't attach: the
+    // FK to auth.users rejects it, and we retry via email.
+    let attached = false
+    if (event.customUserId) {
+      const { error: byIdErr } = await supabase
         .from('licenses')
-        .update({ user_id: userId, claimed_at: new Date().toISOString() })
+        .update({ user_id: event.customUserId, claimed_at: new Date().toISOString() })
         .eq('id', license.id)
         .is('user_id', null)
-      if (attachErr) throw attachErr
+      attached = !byIdErr
+      if (byIdErr) console.error('attach by custom user_id failed, will try email:', byIdErr.message)
+    }
+    if (!attached) {
+      const { data: userId, error: lookupErr } = await supabase.rpc('user_id_by_email', { p_email: buyerEmail })
+      if (lookupErr) throw lookupErr
+      if (userId) {
+        const { error: attachErr } = await supabase
+          .from('licenses')
+          .update({ user_id: userId, claimed_at: new Date().toISOString() })
+          .eq('id', license.id)
+          .is('user_id', null)
+        if (attachErr) throw attachErr
+      }
     }
   }
 

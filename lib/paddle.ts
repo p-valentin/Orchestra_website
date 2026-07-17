@@ -45,13 +45,17 @@ function ensurePaddle(): Promise<Paddle> {
   return ready
 }
 
-// Opens the checkout overlay for the lifetime price. Prefilling the email means
-// the purchase auto-attaches to that account (the webhook matches on email).
-export async function openPaddleCheckout(opts: { email?: string; successUrl?: string } = {}): Promise<void> {
+// Opens the checkout overlay for the lifetime price. The email is only a
+// prefill — the buyer can change it in Paddle — so the license is bound to the
+// signed-in account by passing its user_id as custom_data. The webhook attaches
+// on that id, not on whatever email is typed, so changing the email can't
+// misdirect the purchase.
+export async function openPaddleCheckout(opts: { email?: string; userId?: string; successUrl?: string } = {}): Promise<void> {
   const P = await ensurePaddle()
   P.Checkout.open({
     items: [{ priceId: PRICE_ID, quantity: 1 }],
     ...(opts.email ? { customer: { email: opts.email } } : {}),
+    ...(opts.userId ? { customData: { user_id: opts.userId } } : {}),
     ...(opts.successUrl ? { settings: { successUrl: opts.successUrl } } : {}),
   })
 }

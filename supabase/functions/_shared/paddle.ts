@@ -77,6 +77,10 @@ export interface PaddleEvent {
   // (e.g. "113783-10001") — what a buyer can quote to support. The txn id is
   // machine-facing; this is the one that appears on their receipt.
   invoiceNumber: string | null
+  // custom_data.user_id we set when opening checkout for a signed-in buyer.
+  // Binds the purchase to that account regardless of the email they type into
+  // Paddle, so a changed email can't misdirect the license.
+  customUserId: string | null
 }
 
 // Tolerant extraction: missing fields become null and the handler decides
@@ -98,6 +102,7 @@ export function parsePaddleEvent(payload: any): PaddleEvent {
     adjustmentAction: isAdjustment ? str(data.action) : null,
     adjustmentStatus: isAdjustment ? str(data.status) : null,
     invoiceNumber: str(data.invoice_number),
+    customUserId: str(data.custom_data?.user_id),
   }
 }
 

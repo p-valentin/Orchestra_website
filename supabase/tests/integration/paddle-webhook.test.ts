@@ -151,6 +151,41 @@ Deno.test('32p. buyer email with an existing account → auto-attached', async (
   }
 })
 
+Deno.test('32p-b. custom_data.user_id binds the license to that account, even when the Paddle email differs', async () => {
+  // The account that clicked Buy while signed in.
+  const account = await createTestUser(uniqueEmail('pd32b-acct'))
+  // A DIFFERENT address typed into the Paddle checkout — it has no account and
+  // must NOT capture the license; the signed-in account must.
+  const typedEmail = uniqueEmail('pd32b-typed')
+  const [txn, ctm] = [nextId('txn'), nextId('ctm')]
+  try {
+    await registerCustomer(ctm, typedEmail)
+    const raw = JSON.stringify({
+      event_id: `evt_${crypto.randomUUID()}`,
+      event_type: 'transaction.completed',
+      occurred_at: new Date().toISOString(),
+      data: {
+        id: txn,
+        status: 'completed',
+        customer_id: ctm,
+        currency_code: 'USD',
+        custom_data: { user_id: account.id },
+        details: { totals: { total: '12900' } },
+      },
+    })
+    assertEquals((await deliver(raw)).status, 200)
+
+    const { data: lic } = await admin
+      .from('licenses').select('user_id, buyer_email, claimed_at').eq('order_id', txn).single()
+    assertEquals(lic!.user_id, account.id, 'attaches to the account that clicked Buy, not the typed email')
+    assertEquals(lic!.buyer_email, typedEmail, 'buyer_email still records the Paddle-entered address')
+    assertExists(lic!.claimed_at)
+  } finally {
+    await cleanupPaddle({ txn: [txn], ctm: [ctm] })
+    await deleteTestUser(account.id)
+  }
+})
+
 Deno.test('33p. unknown email stays unclaimed; later /entitlement auto-claims it', async () => {
   const email = uniqueEmail('pd33')
   const [txn, ctm] = [nextId('txn'), nextId('ctm')]
