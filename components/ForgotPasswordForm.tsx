@@ -20,15 +20,23 @@ export default function ForgotPasswordForm() {
         redirectTo: authRedirectTo('/reset-password'),
       })
       // Deliberately not surfacing "no such user": that would turn this form
-      // into an account-existence oracle. Rate limiting is the one case worth
-      // reporting, since the mail genuinely didn't go out.
-      if (error && /rate|too many/i.test(error.message)) {
-        setError('Too many attempts — wait a minute and try again.')
-      } else {
+      // into an account-existence oracle (Supabase itself answers success
+      // there). Every OTHER error means the mail genuinely didn't go out —
+      // showing "✓ on its way" for a malformed address or a server error
+      // would leave the user waiting for mail that can never come.
+      if (!error) {
         setSent(true)
+      } else if (/rate|too many/i.test(error.message)) {
+        setError('Too many attempts — wait a minute and try again.')
+      } else if (/invalid|unable to validate/i.test(error.message)) {
+        setError("That email doesn't look right — check it and try again.")
+      } else {
+        setError('Something went wrong — try again.')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong — try again.')
+      // Never surface raw internals (config errors name env vars).
+      console.error(err)
+      setError('Something went wrong — try again.')
     } finally {
       setPending(false)
     }

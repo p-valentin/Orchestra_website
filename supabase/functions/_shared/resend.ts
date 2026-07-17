@@ -33,6 +33,7 @@ export async function sendClaimEmail(to: string, reference: string | null): Prom
   try {
     const res = await fetch(`${RESEND_BASE_URL}/emails`, {
       method: 'POST',
+      signal: AbortSignal.timeout(10_000),
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: Deno.env.get('RESEND_FROM') ?? 'Orchestra <onboarding@resend.dev>',

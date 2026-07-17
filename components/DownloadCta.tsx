@@ -11,8 +11,8 @@ export default function DownloadCta() {
               <span className="block text-brass">14-day free trial.</span>
             </h2>
             <p className="mt-5 max-w-md leading-relaxed text-muted">
-              All features, no card. Create an account, sign in inside the app, and the clock
-              starts with your first run. If Orchestra earns its keep, it&rsquo;s{' '}
+              All features, no card. Create an account, and the clock starts the first time you
+              sign in inside the app. If Orchestra earns its keep, it&rsquo;s{' '}
               <a href="#pricing" className="text-brass-bright underline-offset-4 hover:underline">
                 $129 once
               </a>{' '}

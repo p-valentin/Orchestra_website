@@ -29,6 +29,13 @@ const ContentSecurityPolicy = [
   // Paddle checkout runs in an iframe.
   `frame-src ${PADDLE}`,
   ['connect-src', "'self'", supabaseOrigin, PADDLE].filter(Boolean).join(' '),
+  // No <base> retargeting and no form posts to foreign origins — without
+  // these, script-src's 'unsafe-inline' (which Next's static rendering needs)
+  // leaves injected HTML free to redirect relative URLs or exfiltrate forms.
+  "base-uri 'self'",
+  `form-action 'self' ${PADDLE}`,
+  "object-src 'none'",
+  "frame-ancestors 'none'",
 ].join('; ')
 
 const securityHeaders = [

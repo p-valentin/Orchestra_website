@@ -74,6 +74,21 @@ async function resolveConfig(): Promise<StackConfig> {
         'SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY (hosted).',
     )
   }
+
+  // This server exposes destructive tools (cleanup_test_data deletes auth
+  // users and license rows; set_license_status rewrites licenses). It must
+  // never point at a real project by accident: anything non-local requires an
+  // explicit opt-in.
+  const host = new URL(url).hostname
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' ||
+    host === 'host.docker.internal'
+  if (!isLocal && Deno.env.get('ORCHESTRA_TEST_ALLOW_REMOTE') !== '1') {
+    throw new Error(
+      `Refusing to run against non-local stack "${host}". This harness deletes users and ` +
+        'licenses; set ORCHESTRA_TEST_ALLOW_REMOTE=1 only if that project is disposable.',
+    )
+  }
+
   cachedConfig = { url, anonKey, serviceRoleKey, source }
   return cachedConfig
 }

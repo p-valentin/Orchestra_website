@@ -6,14 +6,18 @@ project_id = "orchestra-license"
 [auth.email]
 enable_confirmations = true
 
-# All three functions require a valid Supabase Auth JWT; the gateway rejects
-# unauthenticated requests before they reach the function (verify_jwt is the
-# default — spelled out here because the endpoints are useless without it).
+# entitlement and claim-legacy require a valid Supabase Auth JWT; the gateway
+# rejects unauthenticated requests before they reach the function (verify_jwt
+# is the default — spelled out because the endpoints are useless without it).
 [functions.entitlement]
 verify_jwt = true
 
+# The browser calls devices cross-origin from /account, and its OPTIONS
+# preflight carries no Authorization header — gateway JWT verification would
+# 401 the preflight and break the page. The function authenticates every
+# non-OPTIONS request itself (authenticateRequest), so nothing is left open.
 [functions.devices]
-verify_jwt = true
+verify_jwt = false
 
 [functions.claim-legacy]
 verify_jwt = true

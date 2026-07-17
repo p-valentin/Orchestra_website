@@ -10,8 +10,15 @@ import { authenticateRequest, errorResponse, json, readJsonBody, serviceClient }
 import { importLegacyPublicKey, verifyLegacyToken } from '../_shared/legacy.ts'
 import { sha256Hex } from '../_shared/util.ts'
 
-// Key import happens once per isolate, not per request.
-const publicKeyPromise = importLegacyPublicKey(Deno.env.get('LEGACY_SIGNING_KEY') ?? '')
+// Key import happens once per isolate, not per request. The rejection handler
+// keeps a missing/malformed key from becoming an unhandled rejection that can
+// kill the isolate at boot; requests fail closed with a clean 500 instead.
+const publicKeyPromise = importLegacyPublicKey(
+  Deno.env.get('LEGACY_SIGNING_KEY') ?? '',
+).catch((err: unknown) => {
+  console.error('legacy key import failed:', err instanceof Error ? err.message : err)
+  return null
+})
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return errorResponse(405, 'method_not_allowed')
@@ -26,8 +33,11 @@ Deno.serve(async (req) => {
   if (!legacyToken) return errorResponse(400, 'invalid_token')
 
   try {
+    const publicKey = await publicKeyPromise
+    if (!publicKey) return errorResponse(500, 'internal_error')
+
     // Signature check first — an invalid token must not even cost a lookup.
-    const verified = await verifyLegacyToken(legacyToken, await publicKeyPromise)
+    const verified = await verifyLegacyToken(legacyToken, publicKey)
     if (!verified.ok) return errorResponse(400, 'invalid_token')
 
     const tokenHash = await sha256Hex(legacyToken)

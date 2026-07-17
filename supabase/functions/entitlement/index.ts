@@ -23,8 +23,15 @@ export const TRIAL_DAYS = 14
 const PLATFORMS = new Set(['windows', 'macos', 'linux'])
 const FINGERPRINT_RE = /^[0-9a-f]{64}$/
 
-// Key import happens once per isolate, not per request.
-const privateKeyPromise = importEntitlementPrivateKey(Deno.env.get('ENTITLEMENT_PRIVATE_KEY') ?? '')
+// Key import happens once per isolate, not per request. The rejection handler
+// keeps a missing/malformed key from becoming an unhandled rejection that can
+// kill the isolate at boot; requests fail closed with a clean 500 instead.
+const privateKeyPromise = importEntitlementPrivateKey(
+  Deno.env.get('ENTITLEMENT_PRIVATE_KEY') ?? '',
+).catch((err: unknown) => {
+  console.error('entitlement key import failed:', err instanceof Error ? err.message : err)
+  return null
+})
 
 interface LicenseRow {
   id: string
@@ -78,19 +85,13 @@ async function resolveLicense(
     }
   }
 
-  // No usable license. Report the most specific state we know: the user's own
-  // most recent license, else an unclaimed one matching their email.
-  let dead: LicenseRow | undefined = (own as LicenseRow[])[0]
-  if (!dead && email) {
-    const { data: unclaimedDead } = await supabase
-      .from('licenses')
-      .select('id, status, plan, purchased_at')
-      .is('user_id', null)
-      .eq('buyer_email', email)
-      .order('purchased_at', { ascending: false })
-      .limit(1)
-    dead = (unclaimedDead as LicenseRow[] | null)?.[0]
-  }
+  // No usable license. Report the state of the user's OWN most recent one
+  // only. Unclaimed rows deliberately don't count as a dead state here:
+  // buyer_email is whatever was typed into Paddle, unverified — matching it
+  // would let anyone block an arbitrary email's account (and kill its trial)
+  // by buying and refunding a purchase in that name. An unclaimed refunded
+  // row simply never attaches to anything.
+  const dead: LicenseRow | undefined = (own as LicenseRow[])[0]
   if (dead?.status === 'refunded') return { error: errorResponse(403, 'license_refunded') }
   if (dead?.status === 'revoked') return { error: errorResponse(403, 'license_revoked') }
   return { none: true }
@@ -103,6 +104,7 @@ async function resolveTrial(
   supabase: SupabaseClient,
   user: User,
   fingerprint: string,
+  mode: EntitlementMode,
 ): Promise<{ endsAt: string } | { error: Response }> {
   const { data: trial, error: findErr } = await supabase
     .from('trials')
@@ -115,6 +117,12 @@ async function resolveTrial(
     if (Date.parse(trial.ends_at) > Date.now()) return { endsAt: trial.ends_at }
     return { error: errorResponse(403, 'trial_expired') }
   }
+
+  // Only a user-initiated activate may START a trial. A background refresh
+  // that reaches this point holds no license and no trial row; creating one
+  // would let a refused refresh (e.g. from a removed device) silently start
+  // the 14-day clock and burn this machine's fingerprint block.
+  if (mode === 'refresh') return { error: errorResponse(403, 'trial_expired') }
 
   // Soft device block: a fingerprint that already started a trial under any
   // account (it can't be this one — this user has no row) is denied.
@@ -158,6 +166,23 @@ interface DeviceFields {
 // a device kills it on its next check-in instead of after the token's 7-day
 // grace. The grace only ever covers being offline, not being removed.
 export type EntitlementMode = 'activate' | 'refresh'
+
+// The DB trigger (migration 0005) is the concurrency backstop for the slot
+// cap: racing activations that all passed the in-function count make the
+// trigger raise 'device_limit', which maps to the same 409 as the count.
+function isSlotLimitError(error: { code?: string; message?: string }): boolean {
+  return error.code === 'P0001' && (error.message ?? '').includes('device_limit')
+}
+
+async function deviceLimitResponse(supabase: SupabaseClient, user: User): Promise<Response> {
+  const { data: activeDevices } = await supabase
+    .from('devices')
+    .select('id, name, platform, last_seen_at')
+    .eq('user_id', user.id)
+    .is('revoked_at', null)
+    .order('last_seen_at', { ascending: false })
+  return errorResponse(409, 'device_limit', { devices: activeDevices ?? [] })
+}
 
 // Upserts the device on (user_id, fingerprint_hash) within the 3-slot limit.
 // Returns the device id or the 409 response listing the active devices.
@@ -212,7 +237,10 @@ async function upsertDevice(
       .from('devices')
       .update({ revoked_at: null, last_seen_at: now, app_version: fields.appVersion, name: fields.name })
       .eq('id', existing.id)
-    if (error) throw error
+    if (error) {
+      if (isSlotLimitError(error)) return { error: await deviceLimitResponse(supabase, user) }
+      throw error
+    }
     return { deviceId: existing.id }
   }
 
@@ -227,7 +255,22 @@ async function upsertDevice(
     })
     .select('id')
     .single()
-  if (insertErr) throw insertErr
+  if (insertErr) {
+    if (isSlotLimitError(insertErr)) return { error: await deviceLimitResponse(supabase, user) }
+    // Unique-violation race on (user_id, fingerprint_hash): a concurrent
+    // activate from this same machine won. Answer with the winner's row.
+    if (insertErr.code === '23505') {
+      const { data: raced, error: racedErr } = await supabase
+        .from('devices')
+        .select('id, revoked_at')
+        .eq('user_id', user.id)
+        .eq('fingerprint_hash', fields.fingerprint)
+        .maybeSingle()
+      if (racedErr) throw racedErr
+      if (raced && raced.revoked_at === null) return { deviceId: raced.id }
+    }
+    throw insertErr
+  }
   return { deviceId: created.id }
 }
 
@@ -258,7 +301,7 @@ Deno.serve(async (req) => {
     if ('license' in resolved) {
       plan = resolved.license.plan
     } else {
-      const trial = await resolveTrial(supabase, user, fingerprint)
+      const trial = await resolveTrial(supabase, user, fingerprint, mode)
       if ('error' in trial) return trial.error
       plan = 'trial'
       // The token must never outlive the trial (Phase 1.5 §3)...
@@ -271,7 +314,9 @@ Deno.serve(async (req) => {
     const device = await upsertDevice(supabase, user, { fingerprint, name, platform, appVersion }, mode)
     if ('error' in device) return device.error
 
-    const { token, expiresAt } = await signEntitlementToken(await privateKeyPromise, {
+    const privateKey = await privateKeyPromise
+    if (!privateKey) return errorResponse(500, 'internal_error')
+    const { token, expiresAt } = await signEntitlementToken(privateKey, {
       userId: user.id,
       deviceId: device.deviceId,
       plan,

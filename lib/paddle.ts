@@ -22,7 +22,9 @@ interface Paddle {
 
 let ready: Promise<Paddle> | null = null
 
-// Loads and initialises Paddle.js exactly once.
+// Loads and initialises Paddle.js once — but a FAILED load is not cached:
+// keeping the rejected promise would make one transient network hiccup or a
+// momentary ad-blocker kill every later buy click until a full page reload.
 function ensurePaddle(): Promise<Paddle> {
   if (ready) return ready
   ready = new Promise<Paddle>((resolve, reject) => {
@@ -39,7 +41,11 @@ function ensurePaddle(): Promise<Paddle> {
     s.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'
     s.async = true
     s.onload = init
-    s.onerror = () => reject(new Error('Paddle failed to load'))
+    s.onerror = () => {
+      s.remove()
+      ready = null // let the next click retry the load
+      reject(new Error('Paddle failed to load'))
+    }
     document.head.appendChild(s)
   })
   return ready

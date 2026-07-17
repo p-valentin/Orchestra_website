@@ -13,13 +13,18 @@ export const metadata: Metadata = {
 // code (Supabase auth, Paddle checkout, the entitlement/devices functions,
 // Sentry with sendDefaultPii:false, the cookieless /api/hit beacon). If the
 // product changes, change this page in the same PR.
+//
+// TODO(owner, launch blocker): replace the [SELLER LEGAL NAME] and
+// [REGISTERED ADDRESS] placeholders below (and in app/eula/page.tsx) with the
+// real legal identity — GDPR Art. 13 requires the controller's identity and
+// address.
 
 const POLICY = `
 Orchestra is a desktop app for browser automation, made by a small independent team. This page explains what data we handle when you use the app or this website, why we handle it, and what you can ask of us. Questions or requests: [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
 
 ## Who we are
 
-Orchestra is operated from Romania, and we are the data controller for the information described here. For any privacy or data-protection question, or to exercise the rights below, email [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
+Orchestra is operated by **[SELLER LEGAL NAME]**, [REGISTERED ADDRESS], Romania — the data controller for the information described here. For any privacy or data-protection question, or to exercise the rights below, email [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
 
 ## The short version
 
@@ -33,17 +38,17 @@ We use your account to attach your purchase, your trial, and your devices to you
 
 ## Purchases
 
-Checkout is operated by **Paddle**, our merchant of record — the seller you buy from. Your card or payment details go to Paddle and never touch our servers. From each purchase we receive your **email address**, an **order reference**, and the **transaction status** (paid, refunded), which is what we need to create and maintain your license. Legal basis: performance of a contract.
+Checkout is operated by **Paddle**, our merchant of record — the seller you buy from. Your card or payment details go to Paddle and never touch our servers. From each purchase we receive your **email address**, an **order reference**, and the **transaction status** (paid, refunded), which is what we need to create and maintain your license. To keep payment processing reliable and auditable we also store the raw notifications Paddle sends about your purchase — they can include your Paddle customer reference, the email used at checkout, and transaction details, and we delete them within **24 months** (the license record itself stays). Legal basis: performance of a contract.
 
 ## Licenses, trials, and devices
 
 To enforce the 3-device limit and the 14-day trial, we keep:
 
-- **License records** — your email, order reference, and status (active, refunded, revoked).
+- **License records** — your email, order reference, and status (active, refunded, revoked). A license claimed with a pre-account (legacy or beta) key also keeps a one-way hash of that key.
 - **Device records** — a cryptographic one-way hash of a machine identifier (we cannot reverse it into anything about your hardware), a device name, the platform (Windows/macOS/Linux), the app version, and when the device last checked in.
-- **Trial records** — start and end dates.
+- **Trial records** — start and end dates, plus the one-way device hash the trial started on. That hash is checked when any account starts a trial, so one machine can't get endless trials across accounts.
 
-The app talks to our license server when you sign in and roughly **once a week** after that to renew its offline pass; between check-ins it runs fully offline. Our infrastructure sees your IP address transiently on those requests, as any server does. Legal basis: performance of a contract and legitimate interest in preventing abuse.
+The app talks to our license server when you sign in and, while it is online, briefly **every few minutes** to renew its offline pass; without a connection it runs fully offline for up to 7 days. Our infrastructure sees your IP address transiently on those requests, as any server does — we don't store it. Legal basis: performance of a contract and legitimate interest in preventing abuse.
 
 ## Update checks
 
@@ -55,9 +60,9 @@ When the app crashes or hits an internal error, a report goes to **Sentry**: the
 
 ## This website
 
-Analytics here are **cookieless**: a first-party counter records which page was viewed and, on your first page only, the domain you arrived from — no identifiers, no cookies, nothing tied to you. Vercel, our hosting provider, additionally reports aggregate, anonymized traffic. Signing in on the site keeps a session token in your browser's local storage until you sign out; we set no advertising or analytics cookies.
+Analytics here are **cookieless**: a first-party counter records which page was viewed, the country the request came from (derived from your IP address by our host; the address itself isn't stored), and, on your first page only, the domain you arrived from — no identifiers, no cookies, nothing tied to you. Vercel, our hosting provider, additionally reports aggregate, anonymized traffic. Signing in on the site keeps a session token in your browser's local storage until you sign out; we set no advertising or analytics cookies. Legal basis: legitimate interest in knowing what gets read.
 
-If you use the contact form or send feedback from the app, we receive what you wrote, your email if you provide it, and — for in-app bug reports — the diagnostic log attached to the report. It goes to our inbox and is kept only as long as the conversation needs.
+If you use the contact form or send feedback from the app, we receive what you wrote, your email if you provide it, and — for in-app bug reports — the diagnostic log attached to the report. It goes to our inbox and is kept only as long as the conversation needs. Legal basis: legitimate interest in answering you.
 
 ## Service providers
 
@@ -81,13 +86,13 @@ Your data is encrypted in transit (HTTPS everywhere) and encrypted at rest by ou
 ## How long we keep things
 
 - **Account, license, and device data** — for as long as your account exists. Email us to delete your account; deletion currently happens manually, promptly, and copies in backups age out on our normal backup cycle.
-- **Purchase records** — a minimal record of each transaction outlives account deletion, because tax and accounting law requires it and because it lets us honor your license if you ever come back.
+- **Purchase records** — a minimal record of each transaction outlives account deletion, because tax and accounting law requires it (in Romania, generally 5–10 years) and because it lets us honor your license if you ever come back. Raw payment notifications from Paddle are deleted within 24 months.
 - **Crash reports** — expire automatically after about 90 days.
 - **Analytics** — aggregate counts only, holding no personal data.
 
 ## Your rights
 
-If you're in the EU/UK (and in spirit, wherever you are): you can ask for a copy of your data, ask us to correct or delete it, object to a use of it, or take your data elsewhere. Email [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com) and we'll act on it — normally within one month, as GDPR requires. You can also complain to your local data-protection authority.
+If you're in the EU/UK (and in spirit, wherever you are): you can ask for a copy of your data, ask us to correct or delete it, restrict how we use it while something is disputed, object to a use of it, or take your data elsewhere; where we rely on consent, you can withdraw it at any time. Email [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com) and we'll act on it — normally within one month, as GDPR requires. You can also complain to your data-protection authority — in Romania that is ANSPDCP ([dataprotection.ro](https://www.dataprotection.ro)), or the authority of the country you live in.
 
 ## Legal requests
 
@@ -99,7 +104,7 @@ Orchestra isn't intended for children under 16, and we don't knowingly collect t
 
 ## Changes
 
-If this policy changes in a way that matters, we'll say so on this page and, for significant changes, by email. The date below always reflects the current version.
+If this policy changes in a way that matters, we'll say so on this page and, for significant changes, by email. The "Last updated" date at the top of this page always reflects the current version.
 `
 
 export default function PrivacyPage() {

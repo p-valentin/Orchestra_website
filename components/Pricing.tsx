@@ -1,8 +1,8 @@
-// Pricing: one trial, one price. The buy button always renders; it points at
-// the Paddle-hosted checkout once NEXT_PUBLIC_CHECKOUT_URL is set, and falls
-// back to /login before then (see lib/checkout).
+// Pricing: one trial, one price. The buy button always renders; it opens the
+// Paddle overlay checkout once NEXT_PUBLIC_PADDLE_* are set, and shows as
+// disabled with the "opens at launch" hint before then (see components/BuyButton).
 
-import { CHECKOUT_CONFIGURED } from '@/lib/checkout'
+import { PADDLE_CONFIGURED } from '@/lib/paddle'
 import BuyButton from '@/components/BuyButton'
 
 const TRIAL_POINTS = [
@@ -15,7 +15,7 @@ const TRIAL_POINTS = [
 const LIFETIME_POINTS = [
   'Everything in the trial, forever',
   'Use it on 3 devices — move them whenever you like',
-  'All future updates included',
+  'Free updates for as long as Orchestra is sold',
   'Runs offline for up to 7 days between check-ins',
   'Exports plain Playwright code you own outright',
 ]
@@ -75,7 +75,7 @@ export default function Pricing() {
             <BuyButton className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright">
               Buy Orchestra — $129
             </BuyButton>
-            {!CHECKOUT_CONFIGURED && (
+            {!PADDLE_CONFIGURED && (
               <p className="mt-3 text-xs text-faint">Checkout opens at launch.</p>
             )}
           </div>

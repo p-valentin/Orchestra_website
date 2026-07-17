@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabaseBrowser, authRedirectTo } from '@/lib/supabaseBrowser'
-import { AuthField, AuthButton, AuthError, AuthNote, AuthLink } from '@/components/AuthShell'
+import { AuthField, AuthButton, AuthError, AuthNote } from '@/components/AuthShell'
 
 // Supabase's own messages are fine for developers, not for buyers. Map the
 // ones people actually hit; anything unexpected falls through verbatim so a
@@ -12,7 +12,12 @@ function friendlyError(message: string): string {
   if (m.includes('already registered') || m.includes('already been registered')) {
     return 'That email already has an account — sign in, or reset your password.'
   }
-  if (m.includes('password')) return 'Password needs to be at least 8 characters.'
+  if (m.includes('password') && (m.includes('at least') || m.includes('short'))) {
+    return 'Password needs to be at least 8 characters.'
+  }
+  // e.g. "Password is known to be weak and easy to guess" — a length hint
+  // would send the user in circles.
+  if (m.includes('password')) return "That password is too easy to guess — pick a different one."
   if (m.includes('invalid') && m.includes('email')) return "That email doesn't look right — check it and try again."
   if (m.includes('rate') || m.includes('too many')) return 'Too many attempts — wait a minute and try again.'
   return message
@@ -37,12 +42,18 @@ export default function SignupForm() {
       done = true
       window.location.assign('/account')
     }
-    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
-      if (session) go()
+    // Only a session for the address that just signed up counts: a session
+    // for anything else is a pre-existing login (INITIAL_SESSION fires
+    // immediately with it), and bouncing to ITS account would swallow the
+    // "check your inbox" screen for the new address.
+    const isNewAccount = (session: { user: { email?: string } } | null) =>
+      session?.user?.email?.toLowerCase() === sentTo
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && isNewAccount(session)) go()
     })
     const poll = setInterval(() => {
       sb.auth.getSession().then(({ data }) => {
-        if (data.session) go()
+        if (isNewAccount(data.session)) go()
       })
     }, 3000)
     return () => {
@@ -87,7 +98,9 @@ export default function SignupForm() {
         setSentTo(email)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong — try again.')
+      // Never surface raw internals (config errors name env vars).
+      console.error(err)
+      setError('Something went wrong — try again.')
     } finally {
       setPending(false)
     }
@@ -100,9 +113,16 @@ export default function SignupForm() {
           ✓ Check <strong>{sentTo}</strong> and click the confirmation link to activate your account.
         </AuthNote>
         <p className="text-sm text-muted">
-          Didn&apos;t get it? Check spam, or <AuthLink href="/signup">try again</AuthLink>. Once
-          confirmed, sign in inside Orchestra — any license you bought with this email attaches
-          automatically.
+          Didn&apos;t get it? Check spam, or{' '}
+          <button
+            type="button"
+            onClick={() => setSentTo(null)}
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            try again
+          </button>
+          . Once confirmed, sign in inside Orchestra — any license you bought with this email
+          attaches automatically.
         </p>
       </div>
     )

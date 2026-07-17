@@ -73,8 +73,8 @@ export default async function DownloadsPage() {
           Download Orchestra.
         </h1>
         <p className="mt-5 max-w-lg text-muted">
-          Every feature free for 14 days — no card. <a href="/signup" className="text-brass-bright underline-offset-4 hover:underline">Create an account</a>, sign in inside the app, and
-          the trial starts with your first run. Then it&rsquo;s{' '}
+          Every feature free for 14 days — no card. <a href="/signup" className="text-brass-bright underline-offset-4 hover:underline">Create an account</a>, and
+          the trial starts the first time you sign in inside the app. Then it&rsquo;s{' '}
           <a href="/#pricing" className="text-brass-bright underline-offset-4 hover:underline">$129 once</a> to keep it forever.
         </p>
 

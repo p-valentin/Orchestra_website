@@ -3,10 +3,12 @@
 // is the Paddle-Signature HMAC, verified on the raw body before anything else.
 //
 // Idempotency (§2.2): every event is inserted into webhook_events first,
-// keyed by Paddle's globally unique event_id; a unique-constraint hit means
-// already processed → 200 and stop. If processing fails AFTER that insert,
-// the event row is deleted before the 500 — otherwise the Paddle retry would
-// hit the dedupe and the event would be lost forever.
+// keyed by Paddle's globally unique event_id; a unique-constraint hit on a row
+// whose processed_at is set means already processed → 200 and stop, while a
+// null processed_at means an earlier attempt died mid-processing and this
+// delivery processes the stored event instead. If processing fails AFTER the
+// insert, the event row is deleted before the 500 — otherwise the Paddle
+// retry would hit the dedupe and the event would be lost forever.
 //
 // Buyer email: Paddle transaction events carry customer_id, not the email.
 // Resolution order: (1) a stored customer.created/updated event for that
@@ -128,10 +130,29 @@ async function handleTransactionCompleted(supabase: SupabaseClient, event: Paddl
   await sendClaimEmail(confirmationEmail, event.invoiceNumber ?? event.entityId)
 }
 
-// adjustment.* with action=refund: only "approved" acts. Out-of-order
-// delivery creates the row as refunded so a late purchase can't resurrect it.
-async function handleRefund(supabase: SupabaseClient, event: PaddleEvent): Promise<void> {
-  if (event.adjustmentAction !== 'refund' || event.adjustmentStatus !== 'approved' || !event.entityId) return
+// adjustment.*: a refund acts only when "approved". A chargeback has no
+// approval step — the bank already reversed the money — so any chargeback
+// revokes, and chargeback_reverse (dispute won) reinstates what the
+// chargeback took. chargeback_warning, credit, and every other action:
+// stored, no-op. Out-of-order delivery creates the row as refunded so a late
+// purchase can't resurrect it.
+async function handleAdjustment(supabase: SupabaseClient, event: PaddleEvent): Promise<void> {
+  if (!event.entityId) return
+  const action = event.adjustmentAction
+
+  if (action === 'chargeback_reverse') {
+    // Only undo a refunded row — a manually revoked license stays revoked.
+    const { error } = await supabase
+      .from('licenses')
+      .update({ status: 'active' })
+      .eq('order_id', event.entityId)
+      .eq('status', 'refunded')
+    if (error) throw error
+    return
+  }
+
+  const revokes = (action === 'refund' && event.adjustmentStatus === 'approved') || action === 'chargeback'
+  if (!revokes) return
 
   const { data: updated, error: updateErr } = await supabase
     .from('licenses')
@@ -192,23 +213,70 @@ Deno.serve(async (req) => {
     payload,
   })
   if (eventErr) {
-    if (eventErr.code === '23505') return json(200, { ok: true }) // retry of a stored event
-    console.error('webhook_events insert failed:', eventErr.message)
-    return errorResponse(500, 'internal_error')
+    if (eventErr.code !== '23505') {
+      console.error('webhook_events insert failed:', eventErr.message)
+      return errorResponse(500, 'internal_error')
+    }
+    // Duplicate delivery. 200 only when the original attempt finished — a
+    // stored row with processed_at still null means that attempt died between
+    // the insert and its compensating delete (isolate killed mid-processing);
+    // a 200 there would stop Paddle's retries and lose the purchase forever.
+    // Process the stuck event on this delivery instead. A concurrent
+    // still-in-flight first attempt can double-process down this path: every
+    // handler is idempotent, so at worst the claim email sends twice.
+    const { data: prior, error: priorErr } = await supabase
+      .from('webhook_events')
+      .select('processed_at')
+      .eq('provider', PROVIDER)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (priorErr) {
+      console.error('webhook_events dedupe read failed:', priorErr.message)
+      return errorResponse(500, 'internal_error')
+    }
+    // Row already released by a failing concurrent attempt: 500 so the next
+    // retry re-inserts cleanly.
+    if (!prior) return errorResponse(500, 'internal_error')
+    if (prior.processed_at !== null) return json(200, { ok: true })
   }
 
   try {
     if (event.eventType === 'transaction.completed') await handleTransactionCompleted(supabase, event)
-    else if (event.eventType.startsWith('adjustment.')) await handleRefund(supabase, event)
+    else if (event.eventType.startsWith('adjustment.')) await handleAdjustment(supabase, event)
     // customer.* events are valuable purely as stored payloads (email source);
     // anything else: stored above, 200, no-op.
 
-    await supabase.from('webhook_events').update({ processed_at: new Date().toISOString() }).eq('event_id', eventId)
+    await supabase
+      .from('webhook_events')
+      .update({ processed_at: new Date().toISOString() })
+      .eq('provider', PROVIDER)
+      .eq('event_id', eventId)
+
+    // Data-minimisation: raw payloads carry buyer details we don't need
+    // forever. Prune processed events past the privacy policy's 24-month
+    // window opportunistically (best-effort — a failure never fails the
+    // webhook). Recent customer.* events stay available as the email source
+    // for late refunds; buyer_email lives on the license row regardless.
+    const cutoff = new Date(Date.now() - 24 * 30.44 * 24 * 60 * 60 * 1000).toISOString()
+    await supabase
+      .from('webhook_events')
+      .delete()
+      .lt('received_at', cutoff)
+      .not('processed_at', 'is', null)
+      .then(({ error }) => {
+        if (error) console.error('webhook_events prune failed:', error.message)
+      })
+
     return json(200, { ok: true })
   } catch (err) {
     // Release the idempotency slot so the Paddle retry can reprocess.
     console.error('webhook processing failed:', err instanceof Error ? err.message : err)
-    await supabase.from('webhook_events').delete().eq('event_id', eventId).is('processed_at', null)
+    await supabase
+      .from('webhook_events')
+      .delete()
+      .eq('provider', PROVIDER)
+      .eq('event_id', eventId)
+      .is('processed_at', null)
     return errorResponse(500, 'internal_error')
   }
 })

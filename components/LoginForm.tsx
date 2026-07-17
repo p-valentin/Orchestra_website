@@ -37,7 +37,10 @@ export default function LoginForm() {
       // Full navigation (not router.push) so the nav re-reads the session.
       window.location.assign('/account')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong — try again.')
+      // Never surface raw internals (config errors name env vars) — the
+      // console gets the detail, the user gets plain language.
+      console.error(err)
+      setError('Something went wrong — try again.')
       setPending(false)
     }
   }

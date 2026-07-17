@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
-import { AuthError } from '@/components/AuthShell'
+import { AuthButton, AuthError, AuthField } from '@/components/AuthShell'
 import BuyButton from '@/components/BuyButton'
 
 // Postgres/PostgREST speak in codes like "JWT issued at future"; buyers should
@@ -40,6 +40,113 @@ function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+// Changing the password re-authenticates with the current one first:
+// updateUser alone would let anyone at an unlocked browser take the account
+// over. The re-auth also refreshes the session, so the update can't fail on
+// a stale token.
+function ChangePasswordForm({ email }: { email: string }) {
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formEl = e.currentTarget
+    const form = new FormData(formEl)
+    const current = String(form.get('current_password') ?? '')
+    const next = String(form.get('new_password') ?? '')
+    setPending(true)
+    setError(null)
+    setDone(false)
+
+    // Mirrors the server's minimum; checked here so the failure is immediate.
+    if (next.length < 8) {
+      setError('The new password needs to be at least 8 characters.')
+      setPending(false)
+      return
+    }
+
+    try {
+      const sb = supabaseBrowser()
+      const { error: authErr } = await sb.auth.signInWithPassword({ email, password: current })
+      if (authErr) {
+        setError('Your current password is incorrect.')
+        return
+      }
+      const { error: updErr } = await sb.auth.updateUser({ password: next })
+      if (updErr) {
+        const m = updErr.message.toLowerCase()
+        if (m.includes('different')) setError('That is already your password — pick a new one.')
+        else if (m.includes('password')) setError('That password is too easy to guess — pick a different one.')
+        else setError('Couldn’t update the password — try again.')
+        return
+      }
+      setDone(true)
+      formEl.reset()
+    } catch {
+      setError('Couldn’t update the password — try again.')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      <AuthField
+        label="Current password"
+        name="current_password"
+        type="password"
+        autoComplete="current-password"
+      />
+      <AuthField
+        label="New password"
+        name="new_password"
+        type="password"
+        autoComplete="new-password"
+        minLength={8}
+        placeholder="At least 8 characters"
+      />
+      <AuthButton pending={pending}>{pending ? 'Updating…' : 'Update password'}</AuthButton>
+      {done && (
+        <p role="status" className="text-sm text-brass-bright">
+          ✓ Password updated.
+        </p>
+      )}
+      <AuthError message={error} />
+    </form>
+  )
+}
+
+// Revokes every session for the account — other browsers and the Orchestra
+// app on all devices. The website's own sign-out stays local so it never
+// yanks the desktop app; this is the deliberate, explained version.
+function SignOutEverywhere() {
+  const [busy, setBusy] = useState(false)
+
+  async function onClick() {
+    setBusy(true)
+    await supabaseBrowser().auth.signOut({ scope: 'global' })
+    window.location.assign('/login')
+  }
+
+  return (
+    <div className="border-t border-line pt-5">
+      <h3 className="text-sm font-medium">Sign out everywhere</h3>
+      <p className="mt-1 text-sm text-muted">
+        Ends your session in every browser and in the Orchestra app on all your devices. If you
+        think someone else has your password, change it above first, then do this.
+      </p>
+      <button
+        onClick={onClick}
+        disabled={busy}
+        className="mt-3 rounded-lg border border-line-strong px-4 py-2 text-sm text-muted transition-colors hover:border-[#f0a8a2]/50 hover:text-[#f0a8a2] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {busy ? 'Signing out…' : 'Sign out everywhere'}
+      </button>
+    </div>
+  )
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-line bg-panel p-6">
@@ -72,6 +179,10 @@ export default function AccountPanel() {
   const [deviceError, setDeviceError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<Device | null>(null)
+  const [awaitingPurchase, setAwaitingPurchase] = useState(false)
+  const dialogTriggerRef = useRef<HTMLElement | null>(null)
+  const dialogCancelRef = useRef<HTMLButtonElement | null>(null)
+  const dialogConfirmRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -126,6 +237,44 @@ export default function AccountPanel() {
       cancelled = true
     }
   }, [])
+
+  // Back from Paddle (successUrl carries ?checkout=success): the webhook that
+  // creates the license usually hasn't landed yet, and showing "No license
+  // yet" plus a live buy button to someone who JUST paid invites a second
+  // purchase. Poll until the license row appears — webhook lag is seconds;
+  // give it two minutes before falling back to the normal view.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('checkout') !== 'success') return
+    window.history.replaceState(null, '', '/account')
+    setAwaitingPurchase(true)
+    const sb = supabaseBrowser()
+    const startedAt = Date.now()
+    const poll = setInterval(() => {
+      sb.from('licenses')
+        .select('status, plan, purchased_at')
+        .order('purchased_at', { ascending: false })
+        .then(({ data }) => {
+          if (data?.some((l) => l.status === 'active')) {
+            setLicenses(data)
+            setAwaitingPurchase(false)
+            clearInterval(poll)
+          } else if (Date.now() - startedAt > 120_000) {
+            setAwaitingPurchase(false)
+            clearInterval(poll)
+          }
+        })
+    }, 3000)
+    return () => clearInterval(poll)
+  }, [])
+
+  // Focus management for the remove-device dialog: initial focus lands on
+  // Cancel, and focus returns to whatever opened it when it closes.
+  useEffect(() => {
+    if (!confirming) return
+    const trigger = dialogTriggerRef.current
+    dialogCancelRef.current?.focus()
+    return () => trigger?.focus()
+  }, [confirming])
 
   async function signOut() {
     // Local scope: signing out of the website must not revoke the session
@@ -192,16 +341,23 @@ export default function AccountPanel() {
               and we’ll sort it out.
             </p>
           </div>
+        ) : awaitingPurchase ? (
+          <div className="space-y-2">
+            <Pill tone="good">Payment received</Pill>
+            <p className="text-sm text-muted">
+              Activating your license — this usually takes a few seconds…
+            </p>
+          </div>
         ) : (
           <div className="space-y-2">
             <Pill tone="off">No license yet</Pill>
             <p className="text-sm text-muted">
               Orchestra is a one-time purchase with a 14-day free trial — no card needed for the
-              trial, it starts the first time you run the app.
+              trial, it starts the first time you sign in inside the app.
             </p>
           </div>
         )}
-        {!activeLicense && (
+        {!activeLicense && !awaitingPurchase && (
           <BuyButton className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brass px-5 py-2.5 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright">
             {deadLicense ? 'Buy a new lifetime license — $129' : 'Buy a lifetime license — $129'}
           </BuyButton>
@@ -262,7 +418,10 @@ export default function AccountPanel() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setConfirming(d)}
+                  onClick={(e) => {
+                    dialogTriggerRef.current = e.currentTarget
+                    setConfirming(d)
+                  }}
                   disabled={removing === d.id}
                   className="shrink-0 rounded-lg border border-line-strong px-3 py-1.5 text-xs text-muted transition-colors hover:border-[#f0a8a2]/50 hover:text-[#f0a8a2] disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -281,30 +440,57 @@ export default function AccountPanel() {
         )}
       </Section>
 
+      <Section title="Security">
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-sm font-medium">Change password</h3>
+            <div className="mt-3 max-w-sm">
+              <ChangePasswordForm email={email ?? ''} />
+            </div>
+          </div>
+          <SignOutEverywhere />
+        </div>
+      </Section>
+
       {confirming && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={() => setConfirming(null)}
-          role="dialog"
-          aria-modal="true"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setConfirming(null)
+            // Two focusables in the dialog; keep Tab (either direction)
+            // cycling between them instead of walking the page behind.
+            if (e.key === 'Tab') {
+              e.preventDefault()
+              if (document.activeElement === dialogCancelRef.current) dialogConfirmRef.current?.focus()
+              else dialogCancelRef.current?.focus()
+            }
+          }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="remove-device-title"
             className="w-full max-w-sm rounded-xl border border-line bg-panel p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-display text-lg font-medium">Remove {confirming.name ?? 'this device'}?</h3>
+            <h3 id="remove-device-title" className="font-display text-lg font-medium">
+              Remove {confirming.name ?? 'this device'}?
+            </h3>
             <p className="mt-2 text-sm text-muted">
               Its slot frees up right away. Orchestra on that device stops working the next time it
               connects to the internet — usually within a few minutes.
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
+                ref={dialogCancelRef}
                 onClick={() => setConfirming(null)}
                 className="rounded-lg border border-line-strong px-4 py-2 text-sm text-muted transition-colors hover:text-fg"
               >
                 Cancel
               </button>
               <button
+                ref={dialogConfirmRef}
                 onClick={() => removeDevice(confirming)}
                 className="rounded-lg border border-[#f0a8a2]/50 px-4 py-2 text-sm font-medium text-[#f0a8a2] transition-colors hover:bg-[#f0a8a2] hover:text-[#1a1306]"
               >

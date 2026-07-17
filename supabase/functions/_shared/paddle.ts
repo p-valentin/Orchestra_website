@@ -118,6 +118,9 @@ export async function fetchCustomerEmail(
   try {
     const res = await fetch(`${baseUrl}/customers/${customerId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
+      // A hung upstream would otherwise stall the webhook until the platform
+      // wall-clock kill — the window that strands its idempotency slot.
+      signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) {
       await res.body?.cancel()

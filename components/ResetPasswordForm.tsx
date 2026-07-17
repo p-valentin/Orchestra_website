@@ -59,14 +59,24 @@ export default function ResetPasswordForm() {
       const client = supabaseBrowser()
       const { error } = await client.auth.updateUser({ password })
       if (error) {
-        setError(/same/i.test(error.message) ? 'That is already your password — pick a new one.' : error.message)
+        const m = error.message.toLowerCase()
+        if (/same|different/.test(m)) setError('That is already your password — pick a new one.')
+        else if (m.includes('password') && (m.includes('at least') || m.includes('short'))) {
+          setError('Password needs to be at least 8 characters.')
+        } else if (m.includes('password')) {
+          setError('That password is too easy to guess — pick a different one.')
+        } else {
+          setError('Couldn’t save the new password — request a fresh reset link and try again.')
+        }
       } else {
         // The recovery session did its job; don't leave it lying around.
         await client.auth.signOut()
         setStage('done')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong — try again.')
+      // Never surface raw internals (config errors name env vars).
+      console.error(err)
+      setError('Something went wrong — try again.')
     } finally {
       setPending(false)
     }
