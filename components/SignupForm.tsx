@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabaseBrowser, authRedirectTo } from '@/lib/supabaseBrowser'
 import { AuthField, AuthButton, AuthError, AuthNote, AuthLink } from '@/components/AuthShell'
 
@@ -23,6 +23,33 @@ export default function SignupForm() {
   const [error, setError] = useState<string | null>(null)
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [existing, setExisting] = useState(false)
+
+  // Once the "check your inbox" screen is up, watch for the account being
+  // confirmed in another tab: confirming writes a session to shared storage,
+  // which supabase-js mirrors here. When it lands, this tab is already signed
+  // in, so send it straight to the account. A slow poll backs up the event.
+  useEffect(() => {
+    if (!sentTo) return
+    const sb = supabaseBrowser()
+    let done = false
+    const go = () => {
+      if (done) return
+      done = true
+      window.location.assign('/account')
+    }
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+      if (session) go()
+    })
+    const poll = setInterval(() => {
+      sb.auth.getSession().then(({ data }) => {
+        if (data.session) go()
+      })
+    }, 3000)
+    return () => {
+      sub.subscription.unsubscribe()
+      clearInterval(poll)
+    }
+  }, [sentTo])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import AuthShell, { AuthNote, AuthLink } from '@/components/AuthShell'
+import WelcomeRedirect from '@/components/WelcomeRedirect'
 
 // Where Supabase sends people after they click the signup confirmation link.
 // Nothing to do here but tell them the truth: the account is live, and the
@@ -20,11 +21,12 @@ export default function WelcomePage() {
         </>
       }
     >
+      <WelcomeRedirect />
       <div className="space-y-4">
-        <AuthNote>✓ Your account is ready. Open Orchestra and sign in with it.</AuthNote>
+        <AuthNote>✓ Your account is confirmed. Signing you in…</AuthNote>
         <p className="text-sm text-muted">
-          If you already bought a license with this email, it attaches the moment you sign in —
-          there&apos;s no key to copy. Otherwise your 14-day trial starts on first sign-in.
+          Taking you to your account. If you bought a license with this email it&apos;s already
+          attached; otherwise your 14-day trial starts the first time you sign in inside Orchestra.
         </p>
       </div>
     </AuthShell>
