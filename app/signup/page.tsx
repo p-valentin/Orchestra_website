@@ -15,8 +15,12 @@ export default function SignupPage() {
       intro="Your account is your license. Bought Orchestra already? Use the same email you paid with — it attaches automatically."
       footer={
         <>
-          Already have an account? Sign in inside Orchestra. Forgot your password?{' '}
+          Already have an account? <AuthLink href="/login">Sign in</AuthLink>. Forgot your password?{' '}
           <AuthLink href="/forgot-password">Reset it</AuthLink>.
+          <span className="mt-2 block text-xs text-faint">
+            By creating an account you agree to the <AuthLink href="/eula">EULA</AuthLink> and{' '}
+            <AuthLink href="/privacy">Privacy Policy</AuthLink>.
+          </span>
         </>
       }
     >
