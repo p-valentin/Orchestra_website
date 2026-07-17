@@ -39,17 +39,17 @@ export default function Pricing() {
   return (
     <section id="pricing" className="border-t border-line">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-        <p className="font-mono text-xs uppercase tracking-[0.18em] text-brass">Pricing</p>
-        <h2 className="mt-4 font-display text-4xl font-medium leading-[1.05] tracking-tight sm:text-5xl">
+        <p className="text-center font-mono text-xs uppercase tracking-[0.18em] text-brass">Pricing</p>
+        <h2 className="mt-4 text-center font-display text-4xl font-medium leading-[1.05] tracking-tight sm:text-5xl">
           Try everything free.
           <span className="block text-brass">Keep it with one payment.</span>
         </h2>
-        <p className="mt-5 max-w-xl leading-relaxed text-muted">
+        <p className="mx-auto mt-5 max-w-xl text-center leading-relaxed text-muted">
           No subscription, no per-run fees. Fourteen days to see if Orchestra earns its keep, then a
           single purchase that covers every update after it.
         </p>
 
-        <div className="mt-12 grid max-w-4xl gap-6 lg:grid-cols-2">
+        <div className="mx-auto mt-12 grid max-w-4xl gap-6 lg:grid-cols-2">
           <div className="rounded-xl border border-line bg-panel p-8 sm:p-10">
             <h3 className="font-display text-2xl font-medium tracking-tight">Free trial</h3>
             <p className="mt-3 flex items-baseline gap-2">
@@ -81,11 +81,11 @@ export default function Pricing() {
           </div>
         </div>
 
-        <p className="mt-8 max-w-2xl text-sm text-muted">
+        <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted">
           Your account is your license — buy with the same email you signed up with and it attaches
-          automatically, nothing to paste. Prices in USD; tax is handled at checkout by Paddle, our
-          merchant of record. Claimed a free license during the beta? That promise stands — yours
-          stays free, forever.
+          automatically, nothing to paste. Shown in USD; at checkout Paddle (our merchant of record)
+          charges in your local currency and handles any tax. Claimed a free license during the
+          beta? That promise stands — yours stays free, forever.
         </p>
       </div>
     </section>
