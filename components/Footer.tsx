@@ -33,6 +33,11 @@ export default function Footer() {
           >
             hello@orchestra-automation.com
           </a>
+          <p className="mt-3 text-sm">
+            <a href="/privacy" className="text-muted transition-colors hover:text-fg">Privacy</a>
+            <span className="mx-2 text-faint">·</span>
+            <a href="/eula" className="text-muted transition-colors hover:text-fg">EULA</a>
+          </p>
         </div>
       </div>
     </footer>

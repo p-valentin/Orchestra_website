@@ -7,3 +7,11 @@ out
 .DS_Store
 public/downloads/*.dmg
 .data/
+
+# Supabase local dev / test artifacts (Phase 1 licensing)
+supabase/.temp/
+supabase/.branches/
+supabase/functions/.env.test
+supabase/tests/.keys.test.json
+supabase/keys/entitlement-private*
+tsconfig.tsbuildinfo

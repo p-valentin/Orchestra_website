@@ -1,11 +1,9 @@
 import type { Metadata } from 'next'
 import { liveVersion } from '@/lib/releases'
-import { getLicenseStatus } from '@/lib/licenses'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
-import BetaSignup from '@/components/BetaSignup'
 import DownloadButton from '@/components/DownloadButton'
-import LicenseCounter from '@/components/LicenseCounter'
+import { ACCOUNTS_ENABLED } from '@/lib/launch'
 
 type PlatformCardProps = {
   icon: React.ReactNode
@@ -58,27 +56,35 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Download Orchestra — Browser Automation for Mac, Windows & Linux',
   description:
-    'Download Orchestra, the desktop studio for browser automation and web scraping. Free to use — build flows visually and export plain Playwright code.',
+    'Download Orchestra, the desktop studio for browser automation and web scraping. 14-day free trial — build flows visually and export plain Playwright code.',
   alternates: { canonical: '/downloads' },
 }
 
 export default async function DownloadsPage() {
-  const [version, license] = await Promise.all([liveVersion(), getLicenseStatus()])
+  const version = await liveVersion()
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
       <main className="hero-light mx-auto w-full max-w-5xl flex-1 px-5 pb-32 pt-40 sm:px-8">
         <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-brass">
-          v{version} · free to use
+          v{version}{ACCOUNTS_ENABLED ? ' · 14-day free trial' : ''}
         </p>
 
         <h1 className="font-display text-5xl font-medium leading-[1.0] tracking-tight sm:text-6xl">
           Download Orchestra.
         </h1>
-        <p className="mt-5 max-w-lg text-muted">
-          No account, no card. Claim your free license below and it stays free for you when paid
-          plans arrive.
-        </p>
+        {ACCOUNTS_ENABLED ? (
+          <p className="mt-5 max-w-lg text-muted">
+            Every feature free for 14 days — no card. <a href="/signup" className="text-brass-bright underline-offset-4 hover:underline">Create an account</a>, and
+            the trial starts the first time you sign in inside the app. Then it&rsquo;s{' '}
+            <a href="/#pricing" className="text-brass-bright underline-offset-4 hover:underline">$129 once</a> to keep it forever.
+          </p>
+        ) : (
+          <p className="mt-5 max-w-lg text-muted">
+            Every feature, free to explore — download Orchestra now. Accounts, the 14-day trial,
+            and one-time purchase open at launch.
+          </p>
+        )}
 
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <PlatformCard
@@ -101,12 +107,6 @@ export default async function DownloadsPage() {
           />
         </div>
 
-        <div className="mt-12 max-w-lg">
-          <div className="mb-3">
-            <LicenseCounter remaining={license.remaining} total={license.total} cutoff={license.cutoff} closed={license.closed} />
-          </div>
-          <BetaSignup remaining={license.remaining} closed={license.closed} />
-        </div>
       </main>
       <Footer />
     </div>

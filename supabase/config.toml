@@ -1,0 +1,28 @@
+# Minimal Supabase CLI config — unspecified sections use CLI defaults.
+project_id = "orchestra-license"
+
+# Unverified throwaway signups must not get trials (Phase 1.5). Mirror this
+# in the hosted dashboard: Auth → Email → "Confirm email".
+[auth.email]
+enable_confirmations = true
+
+# entitlement and claim-legacy require a valid Supabase Auth JWT; the gateway
+# rejects unauthenticated requests before they reach the function (verify_jwt
+# is the default — spelled out because the endpoints are useless without it).
+[functions.entitlement]
+verify_jwt = true
+
+# The browser calls devices cross-origin from /account, and its OPTIONS
+# preflight carries no Authorization header — gateway JWT verification would
+# 401 the preflight and break the page. The function authenticates every
+# non-OPTIONS request itself (authenticateRequest), so nothing is left open.
+[functions.devices]
+verify_jwt = false
+
+[functions.claim-legacy]
+verify_jwt = true
+
+# Public endpoint: Paddle can't send a Supabase JWT. Authentication is the
+# Paddle-Signature HMAC verified inside the function.
+[functions.webhooks-paddle]
+verify_jwt = false
