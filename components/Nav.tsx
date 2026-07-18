@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import LogoMark from './LogoMark'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
-import { SIGNUP_ENABLED } from '@/lib/launch'
+import { ACCOUNTS_ENABLED } from '@/lib/launch'
 
 // `primary` links show in the desktop bar; every link shows in the mobile
 // menu. Keeping the desktop bar to four essentials (plus auth + download)
@@ -83,22 +83,21 @@ export default function Nav() {
         </nav>
 
         <div className="hidden items-center gap-4 lg:flex">
-          {signedIn ? (
-            <a href="/account" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
-              Account
-            </a>
-          ) : (
-            <>
-              <a href="/login" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
-                Log in
+          {ACCOUNTS_ENABLED &&
+            (signedIn ? (
+              <a href="/account" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
+                Account
               </a>
-              {SIGNUP_ENABLED && (
+            ) : (
+              <>
+                <a href="/login" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
+                  Log in
+                </a>
                 <a href="/signup" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
                   Sign up
                 </a>
-              )}
-            </>
-          )}
+              </>
+            ))}
           <a
             href="/downloads"
             className="rounded-lg bg-brass px-5 py-2 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
@@ -133,9 +132,9 @@ export default function Nav() {
               {link.label}
             </a>
           ))}
-          {(signedIn ? [{ href: '/account', label: 'Account' }] : [
+          {(!ACCOUNTS_ENABLED ? [] : signedIn ? [{ href: '/account', label: 'Account' }] : [
             { href: '/login', label: 'Log in' },
-            ...(SIGNUP_ENABLED ? [{ href: '/signup', label: 'Sign up' }] : []),
+            { href: '/signup', label: 'Sign up' },
           ]).map((link) => (
             <a
               key={link.label}

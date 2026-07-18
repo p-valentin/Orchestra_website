@@ -63,8 +63,15 @@ export default function BuyButton({
   }
 
   if (!CHECKOUT_LIVE) {
+    // Dimmed + not-allowed cursor so it plainly reads as disabled rather than a
+    // live brass button; the label stays so the price is still visible.
     return (
-      <button type="button" className={className} disabled title="Available at launch">
+      <button
+        type="button"
+        className={`${className ?? ''} cursor-not-allowed opacity-50 grayscale`}
+        disabled
+        title="Available at launch"
+      >
         {children}
       </button>
     )

@@ -3,7 +3,7 @@ import { liveVersion } from '@/lib/releases'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import DownloadButton from '@/components/DownloadButton'
-import { SIGNUP_ENABLED } from '@/lib/launch'
+import { ACCOUNTS_ENABLED } from '@/lib/launch'
 
 type PlatformCardProps = {
   icon: React.ReactNode
@@ -67,13 +67,13 @@ export default async function DownloadsPage() {
       <Nav />
       <main className="hero-light mx-auto w-full max-w-5xl flex-1 px-5 pb-32 pt-40 sm:px-8">
         <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-brass">
-          v{version}{SIGNUP_ENABLED ? ' · 14-day free trial' : ''}
+          v{version}{ACCOUNTS_ENABLED ? ' · 14-day free trial' : ''}
         </p>
 
         <h1 className="font-display text-5xl font-medium leading-[1.0] tracking-tight sm:text-6xl">
           Download Orchestra.
         </h1>
-        {SIGNUP_ENABLED ? (
+        {ACCOUNTS_ENABLED ? (
           <p className="mt-5 max-w-lg text-muted">
             Every feature free for 14 days — no card. <a href="/signup" className="text-brass-bright underline-offset-4 hover:underline">Create an account</a>, and
             the trial starts the first time you sign in inside the app. Then it&rsquo;s{' '}
