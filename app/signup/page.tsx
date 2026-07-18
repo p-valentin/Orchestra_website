@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import AuthShell, { AuthLink } from '@/components/AuthShell'
 import SignupForm from '@/components/SignupForm'
+import { SIGNUP_ENABLED } from '@/lib/launch'
 
 export const metadata: Metadata = {
   title: 'Create your account — Orchestra',
@@ -9,6 +10,25 @@ export const metadata: Metadata = {
 }
 
 export default function SignupPage() {
+  if (!SIGNUP_ENABLED) {
+    return (
+      <AuthShell
+        title="Accounts open at launch"
+        intro="Sign-ups aren’t open just yet — we’re finishing the last checks before launch."
+        footer={
+          <>
+            Already have an account? <AuthLink href="/login">Sign in</AuthLink>.
+          </>
+        }
+      >
+        <p className="text-sm text-muted">
+          Orchestra is almost ready. Accounts and the 14-day trial open at launch — in the
+          meantime you can still <AuthLink href="/downloads">download the app</AuthLink>.
+        </p>
+      </AuthShell>
+    )
+  }
+
   return (
     <AuthShell
       title="Create your account"

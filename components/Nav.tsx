@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import LogoMark from './LogoMark'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
+import { SIGNUP_ENABLED } from '@/lib/launch'
 
 // `primary` links show in the desktop bar; every link shows in the mobile
 // menu. Keeping the desktop bar to four essentials (plus auth + download)
@@ -91,9 +92,11 @@ export default function Nav() {
               <a href="/login" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
                 Log in
               </a>
-              <a href="/signup" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
-                Sign up
-              </a>
+              {SIGNUP_ENABLED && (
+                <a href="/signup" className="whitespace-nowrap text-sm text-muted transition-colors hover:text-fg">
+                  Sign up
+                </a>
+              )}
             </>
           )}
           <a
@@ -132,7 +135,7 @@ export default function Nav() {
           ))}
           {(signedIn ? [{ href: '/account', label: 'Account' }] : [
             { href: '/login', label: 'Log in' },
-            { href: '/signup', label: 'Sign up' },
+            ...(SIGNUP_ENABLED ? [{ href: '/signup', label: 'Sign up' }] : []),
           ]).map((link) => (
             <a
               key={link.label}

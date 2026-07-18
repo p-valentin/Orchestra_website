@@ -1,9 +1,13 @@
 // Pricing: one trial, one price. The buy button always renders; it opens the
-// Paddle overlay checkout once NEXT_PUBLIC_PADDLE_* are set, and shows as
-// disabled with the "opens at launch" hint before then (see components/BuyButton).
+// Paddle overlay checkout once checkout is live (the launch flag AND the
+// NEXT_PUBLIC_PADDLE_* keys), and shows as disabled with the "Available at
+// launch" hint before then (see components/BuyButton).
 
 import { PADDLE_CONFIGURED } from '@/lib/paddle'
+import { PAID_ENABLED } from '@/lib/launch'
 import BuyButton from '@/components/BuyButton'
+
+const CHECKOUT_LIVE = PAID_ENABLED && PADDLE_CONFIGURED
 
 const TRIAL_POINTS = [
   'Every feature unlocked',
@@ -75,8 +79,8 @@ export default function Pricing() {
             <BuyButton className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright">
               Buy Orchestra — $129
             </BuyButton>
-            {!PADDLE_CONFIGURED && (
-              <p className="mt-3 text-xs text-faint">Checkout opens at launch.</p>
+            {!CHECKOUT_LIVE && (
+              <p className="mt-3 text-xs text-faint">Available at launch.</p>
             )}
           </div>
         </div>

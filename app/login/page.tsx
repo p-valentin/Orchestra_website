@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import AuthShell, { AuthLink } from '@/components/AuthShell'
 import LoginForm from '@/components/LoginForm'
+import { SIGNUP_ENABLED } from '@/lib/launch'
 
 export const metadata: Metadata = {
   title: 'Sign in — Orchestra',
@@ -15,8 +16,12 @@ export default function LoginPage() {
       intro="See your license, trial, and devices. The Orchestra app has its own sign-in — this is for managing your account."
       footer={
         <>
-          No account? <AuthLink href="/signup">Create one</AuthLink>. Forgot your password?{' '}
-          <AuthLink href="/forgot-password">Reset it</AuthLink>.
+          {SIGNUP_ENABLED && (
+            <>
+              No account? <AuthLink href="/signup">Create one</AuthLink>.{' '}
+            </>
+          )}
+          Forgot your password? <AuthLink href="/forgot-password">Reset it</AuthLink>.
         </>
       }
     >
