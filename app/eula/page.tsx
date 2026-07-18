@@ -14,14 +14,14 @@ export const metadata: Metadata = {
 // 7-day offline pass, exported code owned by the user, refund → revocation
 // via Paddle.
 //
-// TODO(owner, launch blocker): replace the [SELLER LEGAL NAME] and
-// [REGISTERED ADDRESS] placeholders below (and in app/privacy/page.tsx) with
-// the real legal identity — EU consumer-information rules require the
-// trader's identity and geographic address, and without them the contract has
-// no determinate counterparty.
+// Seller of record for the SALE is Paddle (see "Buying, taxes, refunds"). The
+// software licensor here is Pirva Valentin, an individual in Romania.
+// NOTE(owner): a geographic contact address is still best practice under EU
+// consumer law — add one to the intro line (and the privacy page) when
+// available.
 
 const EULA = `
-This agreement is between you and **[SELLER LEGAL NAME]**, [REGISTERED ADDRESS], Romania, trading as Orchestra ([orchestra-automation.com](https://orchestra-automation.com), "we"), and covers the Orchestra desktop application and its related services. By installing, accessing, or using Orchestra, you agree to be bound by it. If you don't accept it, don't use the software.
+This agreement is between you and **Pirva Valentin**, an individual based in Romania, trading as Orchestra ([orchestra-automation.com](https://orchestra-automation.com), "we"), and covers the Orchestra desktop application and its related services. By installing, accessing, or using Orchestra, you agree to be bound by it. If you don't accept it, don't use the software.
 
 ## The license you get
 

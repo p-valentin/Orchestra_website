@@ -14,17 +14,16 @@ export const metadata: Metadata = {
 // Sentry with sendDefaultPii:false, the cookieless /api/hit beacon). If the
 // product changes, change this page in the same PR.
 //
-// TODO(owner, launch blocker): replace the [SELLER LEGAL NAME] and
-// [REGISTERED ADDRESS] placeholders below (and in app/eula/page.tsx) with the
-// real legal identity — GDPR Art. 13 requires the controller's identity and
-// address.
+// Data controller: Pirva Valentin, an individual in Romania (contact:
+// hello@orchestra-automation.com). NOTE(owner): GDPR Art. 13 also wants a
+// contact address — add a postal/geographic contact here when available.
 
 const POLICY = `
 Orchestra is a desktop app for browser automation, made by a small independent team. This page explains what data we handle when you use the app or this website, why we handle it, and what you can ask of us. Questions or requests: [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
 
 ## Who we are
 
-Orchestra is operated by **[SELLER LEGAL NAME]**, [REGISTERED ADDRESS], Romania — the data controller for the information described here. For any privacy or data-protection question, or to exercise the rights below, email [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
+Orchestra is operated by **Pirva Valentin**, an individual based in Romania — the data controller for the information described here. For any privacy or data-protection question, or to exercise the rights below, email [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
 
 ## The short version
 
