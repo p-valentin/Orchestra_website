@@ -37,6 +37,8 @@ export default function Footer() {
             <a href="/privacy" className="text-muted transition-colors hover:text-fg">Privacy</a>
             <span className="mx-2 text-faint">·</span>
             <a href="/eula" className="text-muted transition-colors hover:text-fg">EULA</a>
+            <span className="mx-2 text-faint">·</span>
+            <a href="/refunds" className="text-muted transition-colors hover:text-fg">Refunds</a>
           </p>
         </div>
       </div>
