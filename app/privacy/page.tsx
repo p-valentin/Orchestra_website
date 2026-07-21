@@ -23,7 +23,7 @@ Orchestra is a desktop app for browser automation, made by a small independent t
 
 ## Who we are
 
-Orchestra is operated by **Pirva Valentin**, an individual based in Romania — the data controller for the information described here. For any privacy or data-protection question, or to exercise the rights below, email [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
+Orchestra is operated by **Pirva Valentin**, an individual based in Romania, trading as **Orchestra Automation** — the data controller for the information described here. For any privacy or data-protection question, or to exercise the rights below, email [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
 
 ## The short version
 
