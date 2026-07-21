@@ -31,7 +31,7 @@ export default function ContactForm() {
         Start a conversation.
       </h2>
       <p className="mt-4 text-muted">
-        A question about Orchestra, or a job you&apos;d like automated — drop a note, I read everything.
+        A question about Orchestra, or something you&apos;re trying to automate with it — drop a note, I read everything.
       </p>
 
       {state.ok ? (

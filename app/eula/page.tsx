@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 // available.
 
 const EULA = `
-This agreement is between you and **Pirva Valentin**, an individual based in Romania, trading as Orchestra ([orchestra-automation.com](https://orchestra-automation.com), "we"), and covers the Orchestra desktop application and its related services. By installing, accessing, or using Orchestra, you agree to be bound by it. If you don't accept it, don't use the software.
+This agreement is between you and **Pirva Valentin**, an individual based in Romania, trading as **Orchestra Automation** ([orchestra-automation.com](https://orchestra-automation.com), "we"), and covers the Orchestra desktop application and its related services. By installing, accessing, or using Orchestra, you agree to be bound by it. If you don't accept it, don't use the software.
 
 ## The license you get
 
