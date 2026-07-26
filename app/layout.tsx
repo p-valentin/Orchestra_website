@@ -29,43 +29,26 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://orchestra-automation.com'),
   title: {
-    default: 'Orchestra — Browser Automation & Web Scraping Studio',
+    default: 'Orchestra — Build browser automations, export plain Playwright',
     template: '%s',
   },
   description:
-    'Orchestra is a desktop studio for browser automation, web scraping and web RPA. Build flows visually, watch them run live, and export plain Playwright you own forever. No cloud, no subscription, no lock-in.',
+    'A desktop app for building browser automations. Build the flow visually, watch it run in a real browser, export plain Playwright you own. No cloud, no subscription.',
   applicationName: 'Orchestra',
   alternates: { canonical: '/' },
-  keywords: [
-    'browser automation',
-    'web automation',
-    'web scraping',
-    'web scraping tool',
-    'web RPA',
-    'browser RPA',
-    'RPA software',
-    'no-code web scraping',
-    'visual automation',
-    'automate website tasks',
-    'playwright',
-    'playwright codegen alternative',
-    'no-code automation',
-    'desktop automation app',
-    'automation tool',
-  ],
   openGraph: {
-    title: 'Orchestra — Browser Automation & Web Scraping Studio',
+    title: 'Orchestra — Build browser automations, export plain Playwright',
     description:
-      'Build browser automations and web scrapers visually, watch them run live, export plain Playwright you own forever.',
+      'A desktop app for building browser automations. Build the flow visually, watch it run in a real browser, export plain Playwright you own. No cloud, no subscription.',
     type: 'website',
     siteName: 'Orchestra',
     url: 'https://orchestra-automation.com',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Orchestra — Browser Automation & Web Scraping Studio',
+    title: 'Orchestra — Build browser automations, export plain Playwright',
     description:
-      'Build browser automations and web scrapers visually, watch them run live, export plain Playwright you own forever.',
+      'A desktop app for building browser automations. Build the flow visually, watch it run in a real browser, export plain Playwright you own. No cloud, no subscription.',
   },
   robots: { index: true, follow: true },
 }

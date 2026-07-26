@@ -1,7 +1,7 @@
 const CASES = [
   {
-    title: 'Web scraping & data extraction',
-    body: 'Pull products, listings, articles or tables into clean JSON / CSV — with loops, pagination and stealth built in.',
+    title: 'Structured data extraction',
+    body: 'Pull tables, listings and reports into clean JSON / CSV. Loops, pagination, the lot.',
     tools: 'Extract List · Each · Output',
   },
   {
@@ -20,9 +20,9 @@ const CASES = [
     tools: 'Assert · Assert URL · Try/Catch',
   },
   {
-    title: 'Lead lists & research',
-    body: 'Walk directories and profiles, collect names, links and details into a spreadsheet your sales team can actually use.',
-    tools: 'Extract List · Transform · Output',
+    title: 'Systems with no API',
+    body: 'The internal tool, the vendor portal, the admin panel nobody will build you an endpoint for. Automate it like a user would.',
+    tools: 'Navigate · Fill · Extract',
   },
   {
     title: 'Back-office routines',

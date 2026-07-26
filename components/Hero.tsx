@@ -13,7 +13,7 @@ export default function Hero() {
           </h1>
 
           <p className="mt-7 max-w-lg text-lg leading-relaxed text-muted">
-            Orchestra is a desktop studio for browser automation, web scraping and web RPA. Build your
+            Orchestra is a desktop studio for browser automation and web RPA. Build your
             flow from visual steps, watch it run live in a real browser, and export plain Playwright
             that runs anywhere.
           </p>
@@ -51,7 +51,7 @@ export default function Hero() {
         <div className="lg:pl-2">
           <FlowDemo />
           <p className="mt-3.5 text-center font-mono text-xs text-faint">
-            A real Orchestra flow: scrape a bookstore into a CSV — six steps, zero code.
+            A real Orchestra flow: pull a bookstore&rsquo;s listings into a CSV — six steps, zero code.
           </p>
         </div>
       </div>

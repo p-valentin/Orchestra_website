@@ -12,7 +12,7 @@ export default function DownloadCta() {
           All features, no card. Create an account, and the clock starts the first time you
           sign in inside the app. If Orchestra earns its keep, it&rsquo;s{' '}
           <a href="#pricing" className="text-brass-bright underline-offset-4 hover:underline">
-            $129 once
+            $149 once
           </a>{' '}
           — yours forever.
         </p>

@@ -77,7 +77,7 @@ export async function deleteFeedbackAction(formData: FormData): Promise<void> {
   revalidatePath('/admin')
 }
 
-// Manual license fulfillment: after a $129 purchase lands, grant the buyer's
+// Manual license fulfillment: after a $149 purchase lands, grant the buyer's
 // email here — the app's next login/refresh picks it up. Revoke handles
 // refunds/chargebacks; the app hard-blocks on its next refresh.
 export async function grantLicenseAction(formData: FormData): Promise<void> {

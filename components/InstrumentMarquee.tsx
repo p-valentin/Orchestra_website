@@ -6,7 +6,7 @@ const ROW_A = [
 
 const ROW_B = [
   'Condition', 'Each', 'While', 'Try / Catch', 'Cue', 'Group', 'Snippet', 'Value', 'Output',
-  'Transform', 'Evaluate', 'Script', 'Stealth', 'Set Headers', 'Move Mouse', 'Pause', 'Sleep',
+  'Transform', 'Evaluate', 'Script', 'Set Headers', 'Move Mouse', 'Pause', 'Sleep',
   'Stop', 'Success', 'Fail', 'Comment', 'Frame',
 ]
 

@@ -23,7 +23,7 @@ const SPLITS: Split[] = [
       src: '/shots/instruments.png',
       width: 383,
       height: 864,
-      alt: 'An Orchestra flow with Stealth, Set Headers, Navigate, Assert URL, groups, cues, conditions and loops — each step showing its live run time.',
+      alt: 'An Orchestra flow with Set Headers, Navigate, Assert URL, groups, cues, conditions and loops — each step showing its live run time.',
       title: 'flow.orchestra',
       caption: 'A real flow — every step timed and traced as it runs.',
     },
@@ -54,7 +54,7 @@ const SPLITS: Split[] = [
     points: [
       'Fires automatically, the instant the page matches',
       'Perfect for banners, modals and A/B noise',
-      'Human-like mode and stealth for bot-hostile sites',
+      'Nested cues — handlers that arm only inside the step that needs them',
     ],
     shot: {
       src: '/shots/cue.png',

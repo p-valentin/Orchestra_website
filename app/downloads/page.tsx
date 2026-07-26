@@ -56,7 +56,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Download Orchestra — Browser Automation for Mac, Windows & Linux',
   description:
-    'Download Orchestra, the desktop studio for browser automation and web scraping. 14-day free trial — build flows visually and export plain Playwright code.',
+    'Download Orchestra, the desktop studio for browser automation. 14-day free trial — build flows visually and export plain Playwright code.',
   alternates: { canonical: '/downloads' },
 }
 
@@ -77,7 +77,7 @@ export default async function DownloadsPage() {
           <p className="mt-5 max-w-lg text-muted">
             Every feature free for 14 days — no card. <a href="/signup" className="text-brass-bright underline-offset-4 hover:underline">Create an account</a>, and
             the trial starts the first time you sign in inside the app. Then it&rsquo;s{' '}
-            <a href="/#pricing" className="text-brass-bright underline-offset-4 hover:underline">$129 once</a> to keep it forever.
+            <a href="/#pricing" className="text-brass-bright underline-offset-4 hover:underline">$149 once</a> to keep it forever.
           </p>
         ) : (
           <p className="mt-5 max-w-lg text-muted">
