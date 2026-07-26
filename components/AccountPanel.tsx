@@ -359,7 +359,7 @@ export default function AccountPanel() {
         )}
         {!activeLicense && !awaitingPurchase && (
           <BuyButton className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brass px-5 py-2.5 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright">
-            {deadLicense ? 'Buy a new lifetime license — $129' : 'Buy a lifetime license — $129'}
+            {deadLicense ? 'Buy a new lifetime license — $149' : 'Buy a lifetime license — $149'}
           </BuyButton>
         )}
       </Section>

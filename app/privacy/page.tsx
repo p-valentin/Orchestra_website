@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 }
 
 // Written to match what the product actually does — every claim here maps to
-// code (Supabase auth, Paddle checkout, the entitlement/devices functions,
+// code (Supabase auth, checkout, the entitlement/devices functions,
 // Sentry with sendDefaultPii:false, the cookieless /api/hit beacon). If the
 // product changes, change this page in the same PR.
 //
@@ -27,7 +27,7 @@ Orchestra is operated by **Pirva Valentin**, an individual based in Romania, tra
 
 ## The short version
 
-We collect what running a licensed product requires — your email, your license and device records, crash reports — and nothing aimed at tracking you. No advertising, no selling data, no analytics cookies. Payments are processed by Paddle; your card details never reach us.
+We collect what running a licensed product requires — your email, your license and device records, crash reports — and nothing aimed at tracking you. No advertising, no selling data, no analytics cookies. Payments are processed by our payment provider; your card details never reach us.
 
 ## Your account
 
@@ -37,7 +37,7 @@ We use your account to attach your purchase, your trial, and your devices to you
 
 ## Purchases
 
-Checkout is operated by **Paddle**, our merchant of record — the seller you buy from. Your card or payment details go to Paddle and never touch our servers. From each purchase we receive your **email address**, an **order reference**, and the **transaction status** (paid, refunded), which is what we need to create and maintain your license. To keep payment processing reliable and auditable we also store the raw notifications Paddle sends about your purchase — they can include your Paddle customer reference, the email used at checkout, and transaction details, and we delete them within **24 months** (the license record itself stays). Legal basis: performance of a contract.
+Checkout is operated by our payment provider (merchant of record) — the seller you buy from. Your card or payment details go to them and never touch our servers. From each purchase we receive your **email address**, an **order reference**, and the **transaction status** (paid, refunded), which is what we need to create and maintain your license. To keep payment processing reliable and auditable we also store the raw notifications they send about your purchase — they can include your customer reference with that provider, the email used at checkout, and transaction details, and we delete them within **24 months** (the license record itself stays). Legal basis: performance of a contract.
 
 ## Licenses, trials, and devices
 
@@ -70,7 +70,6 @@ We rely on a small number of trusted providers to run Orchestra. They process da
 | Provider | Role | Where |
 | --- | --- | --- |
 | Supabase | Accounts, license database, license server | EU (Frankfurt) |
-| Paddle | Merchant of record — payments, tax, refunds | UK/EU/US |
 | Resend | Transactional email | US |
 | Sentry | Crash reports | US |
 | Vercel | Website hosting and aggregate analytics | Global edge |
@@ -85,7 +84,7 @@ Your data is encrypted in transit (HTTPS everywhere) and encrypted at rest by ou
 ## How long we keep things
 
 - **Account, license, and device data** — for as long as your account exists. Email us to delete your account; deletion currently happens manually, promptly, and copies in backups age out on our normal backup cycle.
-- **Purchase records** — a minimal record of each transaction outlives account deletion, because tax and accounting law requires it (in Romania, generally 5–10 years) and because it lets us honor your license if you ever come back. Raw payment notifications from Paddle are deleted within 24 months.
+- **Purchase records** — a minimal record of each transaction outlives account deletion, because tax and accounting law requires it (in Romania, generally 5–10 years) and because it lets us honor your license if you ever come back. Raw payment notifications from our payment provider are deleted within 24 months.
 - **Crash reports** — expire automatically after about 90 days.
 - **Analytics** — aggregate counts only, holding no personal data.
 

@@ -58,7 +58,7 @@ export default function OpengraphImage() {
           Automate any website. Keep the code.
         </div>
         <div style={{ marginTop: 36, color: '#b3a98f', fontSize: 30, maxWidth: 900, lineHeight: 1.35 }}>
-          Browser automation and web scraping, built visually — exported as plain Playwright you own forever.
+          Browser automation, built visually — exported as plain Playwright you own forever.
         </div>
         <div style={{ marginTop: 48, color: '#c9973f', fontSize: 24, fontFamily: 'monospace' }}>
           orchestra-automation.com

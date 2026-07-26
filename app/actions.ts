@@ -3,7 +3,7 @@
 import { headers } from 'next/headers'
 import { rateLimit } from '@/lib/rateLimit'
 import { sanitizeText, isValidEmail } from '@/lib/sanitize'
-import type { ContactState } from '@/lib/contact'
+import type { ContactState, WaitlistState } from '@/lib/contact'
 
 async function requestIp(): Promise<string> {
   const h = await headers()
@@ -68,4 +68,36 @@ export async function submitContact(
   )
 
   return { ok: true, message: "Thanks — your message is on its way. I'll reply within a day or two.", errors: {} }
+}
+
+// Launch waitlist. Same path as the contact form — honeypot, IP rate limit,
+// Resend to CONTACT_EMAIL — because there is no waitlist table: the list lives
+// in the owner's inbox until there's a reason for it to live anywhere else.
+export async function submitWaitlist(
+  _prev: WaitlistState,
+  formData: FormData,
+): Promise<WaitlistState> {
+  const honeypot = formData.get('company')
+  if (typeof honeypot === 'string' && honeypot.trim() !== '') {
+    return { ok: true, message: "You're on the list.", errors: {} }
+  }
+
+  const limit = rateLimit(`waitlist:${await requestIp()}`)
+  if (!limit.allowed) {
+    const mins = Math.ceil(limit.retryAfterMs / 60000)
+    return {
+      ok: false,
+      message: `You've signed up a few times already. Try again in about ${mins} minute${mins === 1 ? '' : 's'}.`,
+      errors: {},
+    }
+  }
+
+  const email = sanitizeText(formData.get('email'), 254)
+  if (!isValidEmail(email)) {
+    return { ok: false, message: '', errors: { email: "That email address doesn't look right." } }
+  }
+
+  await sendEmail('Orchestra waitlist signup', `Wants to know when licenses go on sale:\n\n${email}`, email)
+
+  return { ok: true, message: "You're on the list. One email when licenses go on sale — nothing else.", errors: {} }
 }

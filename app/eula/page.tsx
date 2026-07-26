@@ -12,10 +12,11 @@ export const metadata: Metadata = {
 // Plain-language EULA matching how the product actually works: account-bound
 // license, 3 device slots, 14-day trial, frequent online re-checks with a
 // 7-day offline pass, exported code owned by the user, refund → revocation
-// via Paddle.
+// via the payment provider.
 //
-// Seller of record for the SALE is Paddle (see "Buying, taxes, refunds"). The
-// software licensor here is Pirva Valentin, an individual in Romania.
+// Seller of record for the SALE is the payment provider (see "Buying, taxes,
+// refunds"). The software licensor here is Pirva Valentin, an individual in
+// Romania.
 // NOTE(owner): a geographic contact address is still best practice under EU
 // consumer law — add one to the intro line (and the privacy page) when
 // available.
@@ -49,11 +50,11 @@ Everything you make with Orchestra is yours. We claim **no rights** over the flo
 
 ## Automation is your responsibility
 
-Orchestra automates real browsers on websites we don't control. **You** are responsible for what your automations do: respecting the terms and rate limits of the sites you automate, and complying with the laws that apply to you and to any data you collect — including privacy laws when scraping personal data. You are solely responsible for obtaining any permission required for the websites or services you automate. We provide the instrument; you conduct.
+Orchestra automates real browsers on websites we don't control. **You** are responsible for what your automations do: respecting the terms and rate limits of the sites you automate, and complying with the laws that apply to you and to any data you collect — including privacy laws when collecting personal data. You are solely responsible for obtaining any permission required for the websites or services you automate. We provide the instrument; you conduct. Our [Acceptable Use Policy](/acceptable-use) sets this out in full, and applies as part of this agreement.
 
 ## Buying, taxes, refunds
 
-Orchestra is sold through **Paddle**, our merchant of record — Paddle is the seller of record for your purchase and their buyer terms apply at checkout. Prices are in USD; any tax is calculated and added by Paddle at checkout. Refunds are handled through Paddle, and refund eligibility is determined by Paddle's applicable policies. If you are a consumer in the EU or UK, nothing here limits your statutory 14-day right of withdrawal for digital purchases — ask Paddle or us within that window and it will be honored. **A refunded or charged-back purchase deactivates its license.**
+Orchestra is sold through our payment provider (merchant of record) — they are the seller of record for your purchase and their buyer terms apply at checkout. Prices are in USD; any tax is calculated and added at checkout. Refunds are handled through our payment provider, and refund eligibility is determined by their applicable policies. If you are a consumer in the EU or UK, nothing here limits your statutory 14-day right of withdrawal for digital purchases — ask them or us within that window and it will be honored. **A refunded or charged-back purchase deactivates its license.**
 
 ## Staying licensed
 

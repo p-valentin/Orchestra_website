@@ -6,16 +6,16 @@ import Markdown from '@/components/Markdown'
 export const metadata: Metadata = {
   title: 'Refund Policy — Orchestra',
   description:
-    'How refunds work for Orchestra: a 14-day free trial, Paddle as merchant of record, and your EU/UK right of withdrawal.',
+    'How refunds work for Orchestra: a 14-day free trial, a merchant-of-record payment provider, and your EU/UK right of withdrawal.',
   alternates: { canonical: '/refunds' },
 }
 
 // Standalone refund policy — the same facts stated in the EULA's "Buying,
-// taxes, refunds" section, pulled out as a clearly-labelled policy (Paddle
-// domain verification wants a visible, distinct refund policy).
+// taxes, refunds" section, pulled out as a clearly-labelled policy (payment
+// providers' domain verification wants a visible, distinct refund policy).
 
 const REFUNDS = `
-Orchestra is a one-time purchase, sold through **Paddle**, our merchant of record. This page explains how refunds work and how to request one. Questions any time: [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
+Orchestra is a one-time purchase, sold through our payment provider (merchant of record). This page explains how refunds work and how to request one. Questions any time: [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
 
 ## Try it free first
 
@@ -23,16 +23,16 @@ Every account gets a **14-day free trial** of the complete product — no card r
 
 ## How to request a refund
 
-Because your purchase is processed by **Paddle** — the merchant of record and seller of record for the transaction — refunds are issued through Paddle. To request one, either:
+Because your purchase is processed by our payment provider (merchant of record) — the seller of record for the transaction — refunds are issued through them. To request one, either:
 
 - Email us at [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com) and we'll arrange it, or
-- Contact Paddle directly using the receipt they emailed you.
+- Contact our payment provider directly using the receipt they emailed you.
 
-Refund eligibility is determined by Paddle's applicable buyer terms together with the rights below. We aim to respond to any refund request within a day or two.
+Refund eligibility is determined by our payment provider's applicable buyer terms together with the rights below. We aim to respond to any refund request within a day or two.
 
 ## EU and UK right of withdrawal
 
-If you are a consumer in the EU or UK, you have a statutory **14-day right of withdrawal** for digital purchases. Ask us or Paddle within 14 days of your purchase and it will be honored — no reason required.
+If you are a consumer in the EU or UK, you have a statutory **14-day right of withdrawal** for digital purchases. Ask us or our payment provider within 14 days of your purchase and it will be honored — no reason required.
 
 ## What happens to your license
 

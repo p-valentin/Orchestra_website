@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Blog — Orchestra',
   description:
-    'Guides and notes on browser automation, web scraping and web RPA — from the team building Orchestra.',
+    'Guides and notes on browser automation and web RPA — from the team building Orchestra.',
   alternates: { canonical: '/blog' },
 }
 
@@ -28,7 +28,7 @@ export default async function BlogPage() {
           Notes on automating the web.
         </h1>
         <p className="mt-6 max-w-xl text-muted">
-          Browser automation, web scraping, web RPA — practical guides from building Orchestra.
+          Browser automation and web RPA — practical guides from building Orchestra.
         </p>
 
         {posts.length === 0 ? (

@@ -1,13 +1,8 @@
-// Pricing: one trial, one price. The buy button always renders; it opens the
-// Paddle overlay checkout once checkout is live (the launch flag AND the
-// NEXT_PUBLIC_PADDLE_* keys), and shows as disabled with the "Available at
-// launch" hint before then (see components/BuyButton).
+// Pricing: one trial, one price. Checkout isn't live yet, so the card carries a
+// waitlist signup instead of a Buy button — a priced button that can't take
+// money reads as a broken store (see components/WaitlistForm).
 
-import { PADDLE_CONFIGURED } from '@/lib/paddle'
-import { PAID_ENABLED } from '@/lib/launch'
-import BuyButton from '@/components/BuyButton'
-
-const CHECKOUT_LIVE = PAID_ENABLED && PADDLE_CONFIGURED
+import WaitlistForm from '@/components/WaitlistForm'
 
 const TRIAL_POINTS = [
   'Every feature unlocked',
@@ -72,24 +67,19 @@ export default function Pricing() {
           <div className="rounded-xl border border-brass/40 bg-panel p-8 sm:p-10">
             <h3 className="font-display text-2xl font-medium tracking-tight">Lifetime</h3>
             <p className="mt-3 flex items-baseline gap-2">
-              <span className="font-display text-5xl font-medium">$129</span>
+              <span className="font-display text-5xl font-medium">$149</span>
               <span className="text-muted">once, forever</span>
             </p>
             <Points items={LIFETIME_POINTS} />
-            <BuyButton className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright">
-              Buy Orchestra — $129
-            </BuyButton>
-            {!CHECKOUT_LIVE && (
-              <p className="mt-3 text-xs text-faint">Available at launch.</p>
-            )}
+            <WaitlistForm />
           </div>
         </div>
 
         <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted">
           Your account is your license — buy with the same email you signed up with and it attaches
-          automatically, nothing to paste. Shown in USD; at checkout Paddle (our merchant of record)
-          charges in your local currency and handles any tax. Claimed a free license during the
-          beta? That promise stands — yours stays free, forever.
+          automatically, nothing to paste. Shown in USD; at checkout our payment provider (merchant
+          of record) charges in your local currency and handles any tax. Claimed a free license
+          during the beta? That promise stands — yours stays free, forever.
         </p>
       </div>
     </section>

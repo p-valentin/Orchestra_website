@@ -1,7 +1,7 @@
 // Paddle Billing overlay checkout. When these are set, the buy button opens
 // Paddle's payment window right on the page:
 //   NEXT_PUBLIC_PADDLE_CLIENT_TOKEN  client-side token (test_… sandbox, live_… prod)
-//   NEXT_PUBLIC_PADDLE_PRICE_ID      the $129 lifetime price id (pri_…)
+//   NEXT_PUBLIC_PADDLE_PRICE_ID      the $149 lifetime price id (pri_…)
 //   NEXT_PUBLIC_PADDLE_ENV           'sandbox' | 'production' (default production)
 //
 // Paddle.js is loaded lazily on first use — nothing ships to visitors who never
