@@ -30,18 +30,16 @@ import { normalizeEmail } from './util.ts'
 
 export const POLAR_SIGNATURE_TOLERANCE_SECONDS = 300
 
-// Standard Webhooks serializes symmetric secrets as base64 with a `whsec_`
-// prefix. Polar shows a raw string instead, so the UTF-8 bytes are the key —
-// but decode the prefixed form too rather than silently HMAC-ing the literal
-// "whsec_..." text, which would fail in a way that looks like a wrong secret.
+// The HMAC key is the UTF-8 bytes of the secret string EXACTLY as stored,
+// including any `whsec_` prefix. Do not be tempted to strip and base64-decode
+// the prefix the way plain Standard Webhooks consumers do — Polar's
+// validateEvent base64-ENCODES the secret before handing it to the reference
+// library, whose constructor then base64-decodes it. Since base64 output never
+// contains `_`, that library's `whsec_` branch is unreachable for Polar and the
+// two transforms cancel to "the literal bytes". Stripping the prefix here would
+// derive a different key from the one Polar signs with, and every delivery
+// would 401 for no visible reason.
 function secretKeyBytes(secret: string): Uint8Array<ArrayBuffer> {
-  if (secret.startsWith('whsec_')) {
-    try {
-      return Uint8Array.from(atob(secret.slice('whsec_'.length)), (c) => c.charCodeAt(0))
-    } catch {
-      // Not valid base64 after the prefix — fall through to the literal bytes.
-    }
-  }
   return new TextEncoder().encode(secret)
 }
 

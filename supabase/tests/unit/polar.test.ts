@@ -123,15 +123,29 @@ Deno.test('an empty secret never verifies (unset POLAR_WEBHOOK_SECRET must fail 
   assertFalse(await verifyPolarSignature(body, headersOf(h), ''))
 })
 
-Deno.test('a whsec_-prefixed secret is base64-decoded per Standard Webhooks', async () => {
-  // Polar shows a raw string, but the spec serializes symmetric secrets as
-  // base64 behind a whsec_ prefix. Accept both so a dashboard change doesn't
-  // become a mystery 401.
-  const raw = 'super-secret-key-material'
-  const prefixed = `whsec_${btoa(raw)}`
+Deno.test('a whsec_-prefixed secret is keyed on its LITERAL bytes, prefix included', async () => {
+  // Polar issues secrets like whsec_ovyN6cPrTv56AApvz… and signs with the
+  // whole string's UTF-8 bytes: validateEvent base64-encodes the secret before
+  // the Standard Webhooks library base64-decodes it, so that library's
+  // prefix-stripping branch never fires (base64 output has no `_`).
+  //
+  // Stripping the prefix and decoding — what a plain Standard Webhooks
+  // consumer does — yields a DIFFERENT key and 401s every real delivery. This
+  // test pins the Polar-correct behaviour.
+  // Self-evidently fake, and built rather than pasted so no secret scanner
+  // mistakes a test fixture for a live credential.
+  const secret = `whsec_${btoa('test-only-never-a-real-secret')}`
   const body = '{"a":1}'
-  const h = await signPolarWebhook(raw, body)
-  assert(await verifyPolarSignature(body, headersOf(h), prefixed))
+  const h = await signPolarWebhook(secret, body)
+  assert(await verifyPolarSignature(body, headersOf(h), secret), 'literal bytes must verify')
+
+  // The tempting-but-wrong derivation must NOT be accepted.
+  const stripped = secret.slice('whsec_'.length)
+  const wrong = await signPolarWebhook(atob(stripped + '='.repeat((4 - stripped.length % 4) % 4)), body)
+  assertFalse(
+    await verifyPolarSignature(body, headersOf(wrong), secret),
+    'base64-decoding the prefix must not verify',
+  )
 })
 
 Deno.test('parsePolarEvent: order.paid fields', () => {
