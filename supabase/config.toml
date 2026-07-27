@@ -26,3 +26,9 @@ verify_jwt = true
 # Paddle-Signature HMAC verified inside the function.
 [functions.webhooks-paddle]
 verify_jwt = false
+
+# Same for Polar: a Standard Webhooks delivery carries no Supabase JWT.
+# Authentication is the webhook-signature HMAC verified inside the function,
+# before the body is parsed.
+[functions.webhooks-polar]
+verify_jwt = false

@@ -238,7 +238,7 @@ export default function AccountPanel() {
     }
   }, [])
 
-  // Back from Paddle (successUrl carries ?checkout=success): the webhook that
+  // Back from Polar (success_url carries ?checkout=success): the webhook that
   // creates the license usually hasn't landed yet, and showing "No license
   // yet" plus a live buy button to someone who JUST paid invites a second
   // purchase. Poll until the license row appears — webhook lag is seconds;

@@ -13,27 +13,33 @@ const supabaseOrigin = (() => {
   }
 })()
 
-// Paddle Billing overlay checkout loads its script from cdn.paddle.com and
-// renders the payment window in iframes under *.paddle.com, so those origins
-// have to be allowed across the relevant directives (per Paddle's CSP guidance).
-const PADDLE = 'https://*.paddle.com'
+// Polar overlay checkout renders the payment window in an iframe served from
+// Polar's own origin (sandbox is a separate host, and the session URL decides
+// which is used). That is the ONLY directive it needs: the overlay script is
+// our own code (lib/polarCheckout.ts, bundled and served from this origin), not
+// a third-party CDN bundle — so script-src stays 'self' rather than
+// allowlisting a general-purpose npm CDN. Everything else Polar does happens
+// inside its own frame, under its own policy.
+//
+// This replaces the six directives that previously allowed https://*.paddle.com.
+const POLAR = 'https://polar.sh https://sandbox.polar.sh'
 
 const ContentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${PADDLE}`,
-  `style-src 'self' 'unsafe-inline' fonts.googleapis.com ${PADDLE}`,
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
   "font-src 'self' fonts.gstatic.com",
   // downloads host allowed so blog posts can embed images/GIFs hosted on the
-  // public R2 bucket alongside the app binaries; Paddle for checkout assets
-  `img-src 'self' data: https://downloads.orchestra-automation.com ${PADDLE}`,
-  // Paddle checkout runs in an iframe.
-  `frame-src ${PADDLE}`,
-  ['connect-src', "'self'", supabaseOrigin, PADDLE].filter(Boolean).join(' '),
+  // public R2 bucket alongside the app binaries.
+  "img-src 'self' data: https://downloads.orchestra-automation.com",
+  // Polar checkout runs in an iframe.
+  `frame-src ${POLAR}`,
+  ['connect-src', "'self'", supabaseOrigin].filter(Boolean).join(' '),
   // No <base> retargeting and no form posts to foreign origins — without
   // these, script-src's 'unsafe-inline' (which Next's static rendering needs)
   // leaves injected HTML free to redirect relative URLs or exfiltrate forms.
   "base-uri 'self'",
-  `form-action 'self' ${PADDLE}`,
+  "form-action 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
 ].join('; ')

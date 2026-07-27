@@ -1,8 +1,13 @@
-// Pricing: one trial, one price. Checkout isn't live yet, so the card carries a
-// waitlist signup instead of a Buy button — a priced button that can't take
-// money reads as a broken store (see components/WaitlistForm).
+// Pricing: one trial, one price. The lifetime card carries the real Buy button
+// again now that Polar checkout is wired; until NEXT_PUBLIC_PAID_ENABLED is set
+// the button renders itself disabled rather than opening an unverified
+// checkout (see components/BuyButton).
 
-import WaitlistForm from '@/components/WaitlistForm'
+import BuyButton from '@/components/BuyButton'
+import { PAID_ENABLED } from '@/lib/launch'
+import { POLAR_CONFIGURED } from '@/lib/polarCheckout'
+
+const CHECKOUT_LIVE = PAID_ENABLED && POLAR_CONFIGURED
 
 const TRIAL_POINTS = [
   'Every feature unlocked',
@@ -71,15 +76,20 @@ export default function Pricing() {
               <span className="text-muted">once, forever</span>
             </p>
             <Points items={LIFETIME_POINTS} />
-            <WaitlistForm />
+            <BuyButton className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brass px-6 py-3 font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright">
+              Buy Orchestra — $149
+            </BuyButton>
+            {!CHECKOUT_LIVE && (
+              <p className="mt-3 text-xs text-faint">Available at launch.</p>
+            )}
           </div>
         </div>
 
         <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted">
-          Your account is your license — buy with the same email you signed up with and it attaches
-          automatically, nothing to paste. Shown in USD; at checkout our payment provider (merchant
-          of record) charges in your local currency and handles any tax. Claimed a free license
-          during the beta? That promise stands — yours stays free, forever.
+          Your account is your license — buy while signed in and it attaches automatically, nothing
+          to paste. Shown in USD; at checkout Polar (our merchant of record) charges in your local
+          currency and handles any tax. Claimed a free license during the beta? That promise stands
+          — yours stays free, forever.
         </p>
       </div>
     </section>

@@ -2,25 +2,25 @@
 
 import { useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
-import { PADDLE_CONFIGURED, openPaddleCheckout } from '@/lib/paddle'
+import { POLAR_CONFIGURED, openPolarOverlay } from '@/lib/polarCheckout'
 import { PAID_ENABLED } from '@/lib/launch'
 
 // Buy is live only when it's both switched on (the launch flag) and wired (the
-// Paddle keys). Until then the button renders disabled — an honest "not yet"
-// beats sending a click into a checkout that isn't verified.
-const CHECKOUT_LIVE = PAID_ENABLED && PADDLE_CONFIGURED
+// Polar product id). Until then the button renders disabled — an honest "not
+// yet" beats sending a click into a checkout that isn't verified.
+const CHECKOUT_LIVE = PAID_ENABLED && POLAR_CONFIGURED
 
 // The buy button. Buying requires a signed-in account — a signed-out visitor is
-// sent to log in first. For a signed-in buyer it opens the Paddle overlay and
-// binds the purchase to that account's user_id via custom_data, so changing the
-// email inside Paddle can't misdirect it: a successful payment activates the
-// license on the account that clicked Buy.
+// sent to log in first. For a signed-in buyer it asks /api/checkout for a Polar
+// session and opens it as an overlay.
+//
+// The account binding lives entirely on the server: /api/checkout verifies the
+// access token sent below and puts THAT user id into checkout metadata, which
+// is the only thing webhooks-polar attaches on. So changing the email inside
+// Polar can't misdirect the purchase, and neither can tampering with this page.
 //
 // There is deliberately NO hosted-checkout-link fallback: a static link can't
-// carry the account's user_id, which would silently break exactly that binding.
-// Until checkout is live (the launch flag AND the Paddle keys) the button
-// renders disabled with "Available at launch" — an honest "not yet" beats
-// sending a click into an unverified checkout.
+// carry the account binding, which would silently break exactly that guarantee.
 //
 // The session is read at click time, so the decision is never stale.
 export default function BuyButton({
@@ -50,13 +50,27 @@ export default function BuyButton({
         return
       }
 
-      await openPaddleCheckout({
-        email: data.session.user.email ?? undefined,
-        userId: data.session.user.id,
-        // /account watches for ?checkout=success and polls the license into
-        // view, so the buyer never sees "No license yet" right after paying.
-        successUrl: `${window.location.origin}/account?checkout=success`,
-      }).catch(() => window.location.assign('/#contact')) // Paddle blocked: don't dead-end
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+      })
+      if (!res.ok) {
+        // Not configured, rate-limited, or Polar is down. Don't dead-end the
+        // buyer on a dead button — send them somewhere a human can help.
+        window.location.assign('/#contact')
+        return
+      }
+      const { url } = await res.json()
+      if (typeof url !== 'string') {
+        window.location.assign('/#contact')
+        return
+      }
+
+      // Resolves when the overlay closes; a completed purchase redirects the
+      // page to /account?checkout=success before that happens.
+      await openPolarOverlay(url)
+    } catch {
+      window.location.assign('/#contact')
     } finally {
       setBusy(false)
     }

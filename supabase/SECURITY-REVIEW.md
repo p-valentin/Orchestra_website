@@ -1,13 +1,14 @@
 # Security review — cross-user data isolation
 
 Scope: the Supabase licensing backend (Phase 1–3) — can one signed-in user
-read or mutate another user's licenses, devices, or trial? Reviewed 2026-07-17.
+read or mutate another user's licenses, devices, or trial? Reviewed 2026-07-17;
+re-reviewed 2026-07-27 for the Paddle → Polar processor swap.
 Verdict: **no path found.** Every invariant below is covered by an automated
-test (`supabase/tests/integration/`), 74/74 green against the local stack.
+test (`supabase/tests/integration/`), 114/114 green against the local stack.
 
 ## The isolation model, and why it holds
 
-Four independent layers each have to fail for a cross-user leak. None do.
+Five independent layers each have to fail for a cross-user leak. None do.
 
 **1. The JWT decides identity — clients never supply it.**
 Every Edge Function resolves the caller with `supabase.auth.getUser(bearer)`
@@ -35,6 +36,20 @@ A user with a different email calls `entitlement` and falls through to their own
 trial; the victim's license stays unclaimed. → test: isolation "license bought
 for another email is never auto-claimed".
 
+**3b. Purchase attribution comes from the checkout metadata, never the email.**
+`webhooks-polar` attaches a license *only* on `data.metadata.user_id`, which
+the site sets server-side in `/api/checkout` from a JWT it verified — the
+browser never supplies it. The webhook deliberately does **not** call
+`user_id_by_email` (the Paddle handler does), so the one buyer-editable field
+at checkout — the email — cannot decide whose account gets a license. An order
+with absent or unresolvable metadata is recorded *unclaimed* and logged, never
+guessed at. Attachment is also one-way: the update is guarded on
+`user_id IS NULL`, so a redelivered or resent order carrying a different
+`user_id` cannot re-point a license that is already owned. Buy-before-signup
+still resolves, but through the reviewed layer 3 path (the buyer's own
+confirmed email), not through the webhook. → tests: polar-webhook 43pl/44pl/
+45pl, isolation "a Polar order cannot re-point an already-claimed license".
+
 **4. A legacy token binds to one account, permanently.**
 `claim-legacy` intentionally does not require an email match (holding a validly
 signed token is the proof of purchase). But once a token's hash is bound to a
@@ -58,6 +73,13 @@ isolation "legacy token bound to A cannot be re-claimed by B".
 - **Paddle webhook** is public but authenticated by HMAC over the raw body,
   verified before any parse; replay window enforced; idempotent on Paddle's
   `event_id`. → tests: paddle unit suite, webhook integration.
+- **Polar webhook** (`webhooks-polar`, the Paddle replacement) is public and
+  authenticated the same way: Standard Webhooks HMAC-SHA256 over
+  `"<webhook-id>.<webhook-timestamp>.<raw body>"`, verified before any parse,
+  ±300 s replay window, all three headers mandatory. Because the id and
+  timestamp are *inside* the signed content, a captured delivery cannot be
+  replayed under a fresh id to defeat the dedupe key. → tests: polar unit
+  suite (12), polar webhook integration (16).
 - **Secrets** are never returned or logged: the private signing key stays in
   the function env; `claim-legacy` never logs the raw token; only its sha256
   hash is stored.
@@ -69,6 +91,12 @@ isolation "legacy token bound to A cannot be re-claimed by B".
 
 ## Go-live items (not vulnerabilities — decisions/ops)
 
+- **Two payment webhooks coexist during the swap.** `webhooks-paddle` is still
+  deployed alongside `webhooks-polar` so the cutover is reversible. Paddle's
+  notification destination should be **disabled in the Paddle dashboard** once
+  Polar is verified, and the function deleted after that — until then both are
+  live writers of `licenses`, which is fine (they key on disjoint order ids)
+  but is one more public endpoint than the product needs.
 - **Two licensing backends coexist in the repo.** The older R2-based
   `/api/license/{login,refresh,register}` (v1.2.0, `lib/accounts.ts` — scrypt
   password hashes on R2) runs alongside the new Supabase backend. Each old

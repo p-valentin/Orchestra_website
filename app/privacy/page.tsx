@@ -37,7 +37,7 @@ We use your account to attach your purchase, your trial, and your devices to you
 
 ## Purchases
 
-Checkout is operated by our payment provider (merchant of record) — the seller you buy from. Your card or payment details go to them and never touch our servers. From each purchase we receive your **email address**, an **order reference**, and the **transaction status** (paid, refunded), which is what we need to create and maintain your license. To keep payment processing reliable and auditable we also store the raw notifications they send about your purchase — they can include your customer reference with that provider, the email used at checkout, and transaction details, and we delete them within **24 months** (the license record itself stays). Legal basis: performance of a contract.
+Checkout is operated by **Polar** (Polar Software Inc.), our merchant of record — the seller you buy from. Your card or payment details go to them and never touch our servers. From each purchase we receive your **email address**, an **order reference**, and the **transaction status** (paid, refunded), which is what we need to create and maintain your license. To keep payment processing reliable and auditable we also store the raw notifications they send about your purchase — they can include your customer reference with Polar, the email used at checkout, and transaction details, and we delete them within **24 months** (the license record itself stays). Legal basis: performance of a contract.
 
 ## Licenses, trials, and devices
 
@@ -69,6 +69,7 @@ We rely on a small number of trusted providers to run Orchestra. They process da
 
 | Provider | Role | Where |
 | --- | --- | --- |
+| Polar | Checkout and payments (merchant of record) | US |
 | Supabase | Accounts, license database, license server | EU (Frankfurt) |
 | Resend | Transactional email | US |
 | Sentry | Crash reports | US |

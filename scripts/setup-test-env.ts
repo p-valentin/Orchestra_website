@@ -40,6 +40,15 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
     (b) => b.toString(16).padStart(2, '0'),
   ).join('')
 
+  // Polar shows the endpoint secret as a plain string and HMACs its UTF-8
+  // bytes (see _shared/polar.ts) — so a throwaway random string is exactly
+  // what the real thing looks like. Deliberately NOT base64/whsec_-prefixed:
+  // the tests should exercise the same derivation production uses.
+  const polarWebhookSecret = 'polar_whs_test_' + Array.from(
+    crypto.getRandomValues(new Uint8Array(24)),
+    (b) => b.toString(16).padStart(2, '0'),
+  ).join('')
+
   const envFile = new URL('supabase/functions/.env.test', root)
   await Deno.writeTextFile(
     envFile,
@@ -48,6 +57,7 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
       `ENTITLEMENT_PRIVATE_KEY=${btoa(entitlement.privatePkcs8Pem)}`,
       `LEGACY_SIGNING_KEY=${btoa(legacy.publicSpkiPem)}`,
       `PADDLE_WEBHOOK_SECRET=${paddleWebhookSecret}`,
+      `POLAR_WEBHOOK_SECRET=${polarWebhookSecret}`,
       // No PADDLE_API_KEY on purpose: the email lookup must resolve from
       // stored customer.* events, and the no-email path must 500-and-release
       // so Paddle's retry can succeed later.
@@ -68,6 +78,7 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
         legacyPrivateKeyPkcs8B64: legacy.privatePkcs8B64Der,
         entitlementPublicJwk: entitlement.publicJwk,
         paddleWebhookSecret,
+        polarWebhookSecret,
       },
       null,
       2,
