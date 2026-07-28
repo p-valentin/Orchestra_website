@@ -15,3 +15,9 @@ supabase/functions/.env.test
 supabase/tests/.keys.test.json
 supabase/keys/entitlement-private*
 tsconfig.tsbuildinfo
+.vercel
+# Local env files only — .env.example is documentation and must stay tracked.
+# `vercel link` writes a bare `.env*` here, which would swallow it.
+.env
+.env.local
+.env*.local
