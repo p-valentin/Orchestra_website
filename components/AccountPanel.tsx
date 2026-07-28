@@ -181,6 +181,7 @@ export default function AccountPanel() {
   const [removing, setRemoving] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<Device | null>(null)
   const [awaitingPurchase, setAwaitingPurchase] = useState(false)
+  const [alreadyOwned, setAlreadyOwned] = useState(false)
   const dialogTriggerRef = useRef<HTMLElement | null>(null)
   const dialogCancelRef = useRef<HTMLButtonElement | null>(null)
   const dialogConfirmRef = useRef<HTMLButtonElement | null>(null)
@@ -237,6 +238,15 @@ export default function AccountPanel() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  // Sent here by the Buy button because this account already holds a licence.
+  // Saying so explicitly beats silently landing them on /account wondering
+  // whether their click did anything.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('already') !== 'owned') return
+    window.history.replaceState(null, '', '/account')
+    setAlreadyOwned(true)
   }, [])
 
   // Back from Polar (success_url carries ?checkout=success): the webhook that
@@ -324,6 +334,12 @@ export default function AccountPanel() {
       </div>
 
       <AuthError message={loadError} />
+
+      {alreadyOwned && (
+        <p className="rounded-lg border border-brass/40 bg-brass/5 px-4 py-3 text-sm text-muted">
+          You already own Orchestra — there’s nothing more to buy. Your lifetime licence is below.
+        </p>
+      )}
 
       <Section title="License">
         {activeLicense ? (

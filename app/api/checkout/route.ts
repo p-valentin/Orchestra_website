@@ -49,9 +49,41 @@ export async function POST(request: NextRequest) {
 
   // getUser() validates the JWT against Supabase Auth — this is the identity
   // the purchase gets bound to.
+  const token = match[1]!
   const supabase = createClient(url, anonKey, { auth: { persistSession: false } })
-  const { data, error } = await supabase.auth.getUser(match[1]!)
+  const { data, error } = await supabase.auth.getUser(token)
   if (error || !data.user) return Response.json({ error: 'unauthenticated' }, { status: 401 })
+
+  // Nobody buys Orchestra twice. This is the authoritative check — the pricing
+  // page hides the button for owners, but a hidden button is a courtesy and a
+  // stale one is inevitable (bought in another tab, or came back to an old
+  // page). Selling a second lifetime licence to someone who already has one is
+  // a refund request and an apology, so refuse it here.
+  //
+  // Read as the CALLER, not with elevated rights: the anon key plus their JWT
+  // means RLS returns their own rows and nothing else, so this needs no new
+  // privilege and cannot be pointed at anyone else's licences.
+  //
+  // Only `active` blocks. A refunded licence should be re-buyable — that is a
+  // customer changing their mind back — and a revoked one is an admin action
+  // where refusing their money is the wrong lever.
+  const asUser = createClient(url, anonKey, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+  const { data: owned, error: ownedErr } = await asUser
+    .from('licenses')
+    .select('id')
+    .eq('status', 'active')
+    .limit(1)
+  if (ownedErr) {
+    // Fail CLOSED: if we cannot tell whether they already own it, do not sell.
+    console.error('[checkout] licence check failed:', ownedErr.message)
+    return Response.json({ error: 'checkout_unavailable' }, { status: 502 })
+  }
+  if (owned && owned.length > 0) {
+    return Response.json({ error: 'already_owned' }, { status: 409 })
+  }
 
   const origin = new URL(request.url).origin
   try {

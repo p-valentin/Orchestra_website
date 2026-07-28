@@ -50,10 +50,26 @@ export default function BuyButton({
         return
       }
 
+      // Owners get sent to their licence rather than into checkout. Checked at
+      // click time rather than on mount so a visitor who never clicks Buy costs
+      // nothing, and RLS scopes the read to their own rows. /api/checkout
+      // repeats this check authoritatively — this one exists purely so an owner
+      // sees "you already own this" instead of a generic failure.
+      const { data: owned } = await sb.from('licenses').select('id').eq('status', 'active').limit(1)
+      if (owned && owned.length > 0) {
+        window.location.assign('/account?already=owned')
+        return
+      }
+
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { Authorization: `Bearer ${data.session.access_token}` },
       })
+      if (res.status === 409) {
+        // Bought in another tab between the check above and this call.
+        window.location.assign('/account?already=owned')
+        return
+      }
       if (!res.ok) {
         // Not configured, rate-limited, or Polar is down. Don't dead-end the
         // buyer on a dead button — send them somewhere a human can help.
