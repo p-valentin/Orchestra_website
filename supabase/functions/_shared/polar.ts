@@ -221,8 +221,21 @@ export function parsePolarEvent(payload: any): PolarEvent {
   const isRefund = eventType.startsWith('refund.')
   const isOrder = eventType.startsWith('order.')
   const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
+  // What the CUSTOMER sees on their statement, which is the only figure worth
+  // putting in an email to them.
+  //
+  // Polar reports refunds net of tax (`amount`) with the tax alongside
+  // (`tax_amount`) and returns both to the buyer. Reporting `amount` alone told
+  // someone who paid $1.00 that they had been refunded $0.83 — which reads as
+  // being short-changed and earns a support ticket, or worse, a chargeback.
+  // Orders are already tax-inclusive in `total_amount`.
+  const refundTotal = isRefund
+    ? (num(data.amount) ?? 0) + (num(data.tax_amount) ?? 0)
+    : null
+
   return {
-    amountCents: isRefund ? num(data.amount) : num(data.total_amount),
+    amountCents: isRefund ? (refundTotal || null) : num(data.total_amount),
     currency: str(data.currency),
     eventType,
     orderId: isRefund ? str(data.order_id) : isOrder ? str(data.id) : null,

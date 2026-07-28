@@ -157,9 +157,13 @@ export default function RefundRequest({
       <h3 id="refund-title" className="font-display text-base font-medium">
         Refund your licence
       </h3>
+      {/* Deliberately no figure here. The old copy hardcoded "$149" — which
+          rendered as "$ $149" thanks to a stray JSX interpolation, and would
+          have been wrong for anyone charged a different amount (tax, another
+          currency, a discount). The receipt already states what they paid. */}
       <p className="mt-1.5 text-sm text-muted">
-        We’ll refund the full ${' '}$149 to your original payment method. Your licence stops
-        working, but the flows you built stay on your machine.
+        We’ll refund your purchase in full, including any tax, to your original payment
+        method. Your licence stops working, but the flows you built stay on your machine.
       </p>
 
       <label className="mt-4 block text-sm text-muted" htmlFor="refund-reason">

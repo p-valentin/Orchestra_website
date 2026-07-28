@@ -58,7 +58,15 @@ function resetMock() {
 // Creates a purchase the way production does — through the webhook — so the
 // stored order.paid event the refund path reads its amount from actually
 // exists.
-async function buy(userId: string, email: string, opts: { daysAgo?: number } = {}) {
+async function buy(
+  userId: string,
+  email: string,
+  opts: { daysAgo?: number; taxCents?: number } = {},
+) {
+  // A real order carries tax, so total_amount and refundable_amount differ.
+  // Every sandbox order had zero tax, which is exactly why the first live
+  // refund failed — the fixture defaults to taxed now.
+  const tax = opts.taxCents ?? 0
   const order = nextId('ord')
   const raw = JSON.stringify({
     type: 'order.paid',
@@ -70,6 +78,10 @@ async function buy(userId: string, email: string, opts: { daysAgo?: number } = {
       billing_reason: 'purchase',
       currency: 'usd',
       total_amount: 14900,
+      net_amount: 14900 - tax,
+      tax_amount: tax,
+      refundable_amount: 14900 - tax,
+      refunded_amount: 0,
       subscription_id: null,
       customer_id: 'cus_test',
       customer: { id: 'cus_test', email },
@@ -355,6 +367,33 @@ Deno.test('70r. a licence with no stored Polar order is not self-refundable', as
 
     const { data: after } = await admin.from('licenses').select('status').eq('id', lic!.id).single()
     assertEquals(after!.status, 'active')
+  } finally {
+    await cleanup([order], [user.id])
+  }
+})
+
+Deno.test('71r. a TAXED order refunds the net amount, not the tax-inclusive total', async () => {
+  // The bug that reached production: Polar's refund API takes the NET amount
+  // and adds the proportional tax back itself. Sending total_amount is
+  // rejected with "Refund amount exceeds refundable amount".
+  //
+  // It survived the whole sandbox suite because every sandbox order had
+  // tax_amount 0, which made the two numbers identical. This asserts they are
+  // NOT identical and that we send the right one.
+  resetMock()
+  const user = await createTestUser(uniqueEmail('r71'))
+  const order = await buy(user.id, user.email, { taxCents: 2400 })
+  try {
+    const res = await callFn('refund-request', { token: user.accessToken, body: { reason: 'bugs' } })
+    assertEquals(res.status, 200)
+
+    assertEquals(mock.calls.length, 1)
+    assertEquals(mock.calls[0].amount, 12500, 'must send net (14900 - 2400), not the 14900 total')
+
+    // The stored figure is what the buyer PAID, because a human reconciles it
+    // against a receipt — that is a different number from the one Polar wants.
+    const { data: rr } = await admin.from('refund_requests').select('amount_cents').eq('order_id', order).single()
+    assertEquals(rr!.amount_cents, 14900, 'admin sees what was charged, tax included')
   } finally {
     await cleanup([order], [user.id])
   }

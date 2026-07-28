@@ -105,9 +105,28 @@ Deno.serve(async (req) => {
     .eq('payload->data->>id', license.order_id)
     .order('received_at', { ascending: false })
     .limit(1)
-  const amountCents = Number(order?.[0]?.payload?.data?.total_amount)
-  const currency = order?.[0]?.payload?.data?.currency ?? null
-  if (!Number.isFinite(amountCents) || amountCents < 1) {
+  const orderData = order?.[0]?.payload?.data
+  const currency = orderData?.currency ?? null
+
+  // Polar's refund API takes the NET amount — before tax — and refunds the
+  // proportional tax on top of it automatically. Sending the tax-inclusive
+  // total is rejected with "Refund amount exceeds refundable amount", so the
+  // buyer gets their money back in full by asking for `refundable_amount`,
+  // not by asking for what they paid.
+  //
+  // This cost us a real failed refund to find: every sandbox order was
+  // zero-tax, which made total_amount and refundable_amount identical and hid
+  // the difference completely. The first order with VAT on it broke.
+  //
+  // `refundable_amount` also already accounts for anything previously
+  // refunded, so it stays correct if a partial refund was ever issued by hand
+  // in Polar's dashboard.
+  const refundableCents = Number(orderData?.refundable_amount ?? orderData?.net_amount)
+  // What the buyer actually paid, tax included — recorded for humans reading
+  // the admin page, never sent to the refund API.
+  const paidCents = Number(orderData?.total_amount)
+
+  if (!Number.isFinite(refundableCents) || refundableCents < 1) {
     console.error(`[refund] no stored Polar order for ${license.order_id} — not self-refundable`)
     return errorResponse(409, 'not_self_refundable')
   }
@@ -135,7 +154,7 @@ Deno.serve(async (req) => {
   const result = await createRefund({
     apiKey,
     orderId: license.order_id,
-    amountCents,
+    amountCents: refundableCents,
     comment: `Self-serve refund from /account — ${reason}`,
   })
 
@@ -160,7 +179,9 @@ Deno.serve(async (req) => {
     .update({
       status: 'refunded',
       provider_refund_id: result.refundId ?? null,
-      amount_cents: amountCents,
+      // Record what the buyer PAID, not the net we asked Polar for — the admin
+      // page is read by a person reconciling against a receipt.
+      amount_cents: Number.isFinite(paidCents) ? paidCents : refundableCents,
       currency,
       completed_at: new Date().toISOString(),
     })

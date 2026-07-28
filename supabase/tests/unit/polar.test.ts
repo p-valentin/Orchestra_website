@@ -221,3 +221,36 @@ Deno.test('parsePolarEvent: amounts come from the right field per event family',
     assertEquals(e.amountCents, null, `should reject ${JSON.stringify(bad)}`)
   }
 })
+
+Deno.test('parsePolarEvent: a refund reports what the BUYER gets back, tax included', () => {
+  // Polar reports refunds net (`amount`) with tax alongside (`tax_amount`) and
+  // returns both to the customer. Emailing `amount` alone told someone who
+  // paid $1.00 that $0.83 had been refunded — which reads as short-changing
+  // them. The customer-facing figure is the sum.
+  const refund = parsePolarEvent({
+    type: 'refund.created',
+    data: { id: 'ref_1', order_id: 'ord_1', status: 'succeeded', amount: 83, tax_amount: 17, currency: 'usd' },
+  })
+  assertEquals(refund.amountCents, 100, 'buyer sees the full amount, not the net')
+
+  // A zero-tax refund is unchanged.
+  const noTax = parsePolarEvent({
+    type: 'refund.created',
+    data: { id: 'ref_2', order_id: 'ord_1', status: 'succeeded', amount: 14900, tax_amount: 0 },
+  })
+  assertEquals(noTax.amountCents, 14900)
+
+  // Missing tax_amount must not turn the amount into null or NaN.
+  const missing = parsePolarEvent({
+    type: 'refund.created',
+    data: { id: 'ref_3', order_id: 'ord_1', status: 'succeeded', amount: 500 },
+  })
+  assertEquals(missing.amountCents, 500)
+
+  // Orders stay tax-inclusive already — no double counting.
+  const order = parsePolarEvent({
+    type: 'order.refunded',
+    data: { id: 'ord_1', status: 'refunded', total_amount: 100, tax_amount: 17 },
+  })
+  assertEquals(order.amountCents, 100)
+})
