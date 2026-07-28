@@ -59,6 +59,18 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },
+  // The "Human-like" instrument category was renamed to "Session & environment".
+  // The old path was indexed and linked from outside, so it redirects rather
+  // than 404s.
+  async redirects() {
+    return [
+      {
+        source: '/docs/instruments/human-like',
+        destination: '/docs/instruments/session-environment',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default nextConfig

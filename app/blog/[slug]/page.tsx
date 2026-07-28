@@ -94,13 +94,13 @@ export default async function BlogPostPage({ params }: Props) {
           <h2 className="font-display text-2xl font-medium tracking-tight">Try Orchestra</h2>
           <p className="mt-2 text-muted">
             A desktop studio for browser automation — build flows visually, watch them run live, and export
-            plain Playwright code you own forever.
+            plain Playwright code you own forever. 14-day free trial, then a one-time $149 license.
           </p>
           <a
             href="/downloads"
             className="mt-5 inline-block rounded-lg bg-brass px-5 py-2.5 text-sm font-semibold text-[#1a1306] transition-colors hover:bg-brass-bright"
           >
-            Download free
+            Try it free for 14 days
           </a>
         </div>
       </main>

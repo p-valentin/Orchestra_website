@@ -19,7 +19,7 @@ You don't need to write code to use Orchestra. You don't need to install Node, a
 
 **Code** covers the [code view and exporting](/docs/code-export) flows as standalone Playwright scripts.
 
-The **Instrument reference** documents every instrument in the palette, category by category: [Browser](/docs/instruments/browser), [Forms](/docs/instruments/forms), [Network](/docs/instruments/network), [Data](/docs/instruments/data), [Checks](/docs/instruments/checks), [Flow](/docs/instruments/flow), [Human-like](/docs/instruments/human-like) and [Advanced](/docs/instruments/advanced).
+The **Instrument reference** documents every instrument in the palette, category by category: [Browser](/docs/instruments/browser), [Forms](/docs/instruments/forms), [Network](/docs/instruments/network), [Data](/docs/instruments/data), [Checks](/docs/instruments/checks), [Flow](/docs/instruments/flow), [Session & environment](/docs/instruments/session-environment) and [Advanced](/docs/instruments/advanced).
 
 **Reference** has the [keyboard shortcuts](/docs/shortcuts) and [settings & themes](/docs/settings), and **Help** collects [troubleshooting fixes](/docs/troubleshooting) and the [FAQ](/docs/faq).
 
