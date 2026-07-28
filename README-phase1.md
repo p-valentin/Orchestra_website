@@ -165,9 +165,30 @@ replay window before anything is parsed. All Polar payload knowledge lives in
   purchase cannot resurrect it.
 - Unknown event types: stored, 200, no-op.
 
-New secret: `POLAR_WEBHOOK_SECRET` (the endpoint secret from the Polar
-dashboard). Website side: `POLAR_ACCESS_TOKEN` (server-only),
-`NEXT_PUBLIC_POLAR_PRODUCT_ID`, `NEXT_PUBLIC_POLAR_ENV`.
+New secrets: `POLAR_WEBHOOK_SECRET` (the endpoint secret from the Polar
+dashboard), `POLAR_API_KEY` + `POLAR_ENV` (self-serve refunds call Polar's API;
+the key needs the `refunds:write` scope, and `POLAR_ENV=sandbox` points it at
+sandbox-api.polar.sh), `OWNER_EMAIL`, `ADMIN_DATA_SECRET`. Website side:
+`POLAR_ACCESS_TOKEN` (server-only), `NEXT_PUBLIC_POLAR_PRODUCT_ID`,
+`NEXT_PUBLIC_POLAR_ENV`, `ADMIN_DATA_SECRET`, `ADMIN_TOTP_SECRET`.
+
+**Who gets which email.** Four templates, two audiences, and the split matters
+because the internal ones carry another customer's address and the sentence
+they wrote about why they left:
+
+| Email | Recipient | Audience |
+|---|---|---|
+| Purchase confirmation (`sendClaimEmail`) | the licence's account address | customer |
+| Refund confirmation (`sendRefundEmail`) | the licence's account address | customer |
+| Refund alert (`sendOwnerRefundNotice`) | `OWNER_EMAIL` | internal |
+| Refund FAILED (`sendOwnerRefundFailure`) | `OWNER_EMAIL` | internal |
+
+The owner address is never derived from the buyer — it is read from
+`OWNER_EMAIL` only, falling back to `SUPPORT_EMAIL`
+(`hello@orchestra-automation.com`). Keep `OWNER_EMAIL` pointed at a business
+inbox rather than a personal one: an owner address that is also a customer
+account makes the two flows indistinguishable while testing, and puts customer
+PII somewhere it does not belong.
 
 **Polar dashboard checklist**: start in the SANDBOX (sandbox.polar.sh —
 separate account, separate token and product id) · product "Orchestra
