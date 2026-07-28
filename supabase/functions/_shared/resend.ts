@@ -303,6 +303,66 @@ export interface OwnerRefundNotice {
   accountEmail: string | null
   amountCents?: number | null
   currency?: string | null
+  // Captured by the self-serve flow. Absent when the refund was issued from
+  // Polar's dashboard, which is itself worth knowing.
+  reason?: string | null
+  detail?: string | null
+}
+
+// Human-readable labels for the reason codes stored in refund_requests. Kept
+// here rather than in the UI because this is where they are read by a person.
+const REASON_LABELS: Record<string, string> = {
+  not_what_expected: 'Not what they expected',
+  missing_feature: 'Missing a feature they needed',
+  too_difficult: 'Too difficult to use',
+  bugs: 'Bugs or it did not work',
+  too_expensive: 'Too expensive',
+  bought_by_mistake: 'Bought by mistake',
+  other: 'Other',
+}
+
+export function reasonLabel(reason: string | null | undefined): string | null {
+  if (!reason) return null
+  return REASON_LABELS[reason] ?? reason
+}
+
+// A refund the buyer asked for but which the PROVIDER refused. The money did
+// not move, so the buyer is sitting in front of a failed request and will
+// email support next — this alert exists so that email is not the first the
+// owner hears of it.
+export interface OwnerRefundFailure {
+  orderId: string
+  buyerEmail: string
+  reason: string
+  detail: string | null
+  error: string
+}
+
+export function ownerRefundFailureText(f: OwnerRefundFailure): string {
+  return [
+    'A SELF-SERVE REFUND FAILED. The buyer asked for their money back and did not get it.',
+    '',
+    `Order id:  ${f.orderId}`,
+    `Buyer:     ${f.buyerEmail || '(none on record)'}`,
+    `Reason:    ${reasonLabel(f.reason) ?? f.reason}`,
+    ...(f.detail ? ['', 'They said:', f.detail] : []),
+    '',
+    `Provider error: ${f.error}`,
+    '',
+    'The licence is still ACTIVE and the request is marked failed, so the buyer',
+    'can retry. Refund manually in Polar if this does not resolve itself.',
+  ].join('\n')
+}
+
+export async function sendOwnerRefundFailure(f: OwnerRefundFailure): Promise<boolean> {
+  const to = Deno.env.get('OWNER_EMAIL') ?? SUPPORT_EMAIL
+  const text = ownerRefundFailureText(f)
+  return await send(
+    to,
+    `Orchestra REFUND FAILED — ${f.orderId}`,
+    text,
+    `<pre style="font:14px/1.6 ui-monospace,Menlo,monospace;white-space:pre-wrap;">${esc(text)}</pre>`,
+  )
 }
 
 // Owner-facing refund alert. Deliberately plain text and deliberately terse:
@@ -316,7 +376,8 @@ export interface OwnerRefundNotice {
 // looking sooner rather than at month end.
 export function ownerRefundNoticeText(n: OwnerRefundNotice): string {
   const amount = formatAmount(n.amountCents, n.currency)
-  return [
+  const label = reasonLabel(n.reason)
+  const lines = [
     'A licence was refunded and is now deactivated.',
     '',
     `Amount:    ${amount ?? '(not reported)'}`,
@@ -324,12 +385,27 @@ export function ownerRefundNoticeText(n: OwnerRefundNotice): string {
     `Order id:  ${n.orderId}`,
     `Buyer:     ${n.buyerEmail || '(none on record)'}`,
     `Account:   ${n.accountEmail ?? '(unclaimed — licence was never attached)'}`,
+  ]
+
+  // The reason is the whole point of asking for one, so it goes near the top
+  // of what a person reads, not buried under provider metadata.
+  if (label) {
+    lines.push(`Reason:    ${label}`)
+    if (n.detail) lines.push('', 'They said:', n.detail)
+    lines.push('', 'Refunded by the buyer from /account, inside the 14-day window.')
+  } else {
+    lines.push('', 'No reason on file — this refund was issued outside the self-serve flow')
+    lines.push('(Polar dashboard, or a chargeback).')
+  }
+
+  lines.push(
     '',
     `Admin: ${SITE_URL}/admin`,
     '',
     'The buyer has been emailed a refund confirmation. No action needed unless',
     'this looks wrong — a refund you did not initiate may be a chargeback.',
-  ].join('\n')
+  )
+  return lines.join('\n')
 }
 
 export async function sendOwnerRefundNotice(n: OwnerRefundNotice): Promise<boolean> {

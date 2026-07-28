@@ -2,13 +2,14 @@
 
 Scope: the Supabase licensing backend (Phase 1–3) — can one signed-in user
 read or mutate another user's licenses, devices, or trial? Reviewed 2026-07-17;
-re-reviewed 2026-07-27 for the Paddle → Polar processor swap.
+re-reviewed 2026-07-27 for the Paddle → Polar processor swap, and 2026-07-28
+for self-serve refunds and the admin commerce views.
 Verdict: **no path found.** Every invariant below is covered by an automated
-test (`supabase/tests/integration/`), 114/114 green against the local stack.
+test (`supabase/tests/integration/`), 150/150 green against the local stack.
 
 ## The isolation model, and why it holds
 
-Five independent layers each have to fail for a cross-user leak. None do.
+Seven independent layers each have to fail for a cross-user leak. None do.
 
 **1. The JWT decides identity — clients never supply it.**
 Every Edge Function resolves the caller with `supabase.auth.getUser(bearer)`
@@ -58,6 +59,35 @@ no auto-transfer. The atomic `user_id IS NULL` guard on the attach makes
 concurrent claims resolve to exactly one winner. → tests: claim-legacy 15,
 isolation "legacy token bound to A cannot be re-claimed by B".
 
+**5. Money only ever moves for the caller's own licence.**
+`refund-request` is the one endpoint that can issue a refund. It takes **no
+licence, order or user id from the request body** — it looks up the caller's
+own active licence from the JWT, so there is nothing to tamper with. Eligibility
+(status, and the 14-day window) is recomputed server-side from stored data; the
+button being visible proves nothing. The double-refund guard is a partial
+UNIQUE INDEX (`refund_requests_one_open_per_license`), not an if-statement, so
+concurrent clicks serialise in the database and the provider is called at most
+once. The licence is **not** deactivated here — that stays with the
+`order.refunded` webhook, keeping one writer for entitlement state. Provider
+error text is never echoed to the browser. → tests: refund-request 60r–69r,
+including a 5-way concurrent double-click and the adversarial "B refunds A's
+licence" case.
+
+**6. The admin commerce data is not reachable by anyone who finds the URL.**
+`admin-data` is public (`verify_jwt = false`) because its caller is the
+website's server, which holds no Supabase session. Its defence is a **signed,
+60-second request** (`_shared/admin-auth.ts`): HMAC over
+`ts.method.path.sha256(body)`, so a captured request is worthless a minute
+later, cannot be replayed against another function, and cannot have its body
+swapped. Deliberately **no static bearer token exists to leak**. Every failure —
+unsigned, mis-signed, stale, wrong view, GET — returns **404**, so a prober
+cannot tell the endpoint exists. There is no query language: the caller picks
+one of two fixed views with fixed columns and a hard 200-row cap. Buyer emails
+are **masked** unless explicitly requested, and account uuids never leave the
+function. In production the whole section stays hidden until `ADMIN_TOTP_SECRET`
+is set, so customer records are never fronted by a shared password alone; the
+admin session was also cut from 7 days to 12 hours. → tests: admin-data 70a–78a.
+
 ## Other checks
 
 - **Device deactivation is not a capability by id.** `devices/deactivate`
@@ -91,6 +121,12 @@ isolation "legacy token bound to A cannot be re-claimed by B".
 
 ## Go-live items (not vulnerabilities — decisions/ops)
 
+- **The website still holds no service-role key.** The admin page reads
+  purchases and refunds through the signed `admin-data` call rather than by
+  gaining RLS bypass, so the "licensing writes all happen in Edge Functions
+  with the service role, which never touches this repo" invariant survives
+  the new sections. `ADMIN_DATA_SECRET` grants read of two fixed views, not
+  the database.
 - **Two payment webhooks coexist during the swap.** `webhooks-paddle` is still
   deployed alongside `webhooks-polar` so the cutover is reversible. Paddle's
   notification destination should be **disabled in the Paddle dashboard** once

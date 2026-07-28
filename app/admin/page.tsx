@@ -14,6 +14,7 @@ import { listClaims } from '@/lib/claims'
 import { signLicense } from '@/lib/token'
 import CopyButton from '@/components/CopyButton'
 import { listAudit } from '@/lib/audit'
+import AdminCommerce from '@/components/AdminCommerce'
 import { listPosts, type BlogPost } from '@/lib/blog'
 import {
   deleteClaimAction,
@@ -509,6 +510,8 @@ export default async function AdminPage({
           )}
         </div>
       </section>
+
+      <AdminCommerce />
 
       <section id="claims" className={section}>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">

@@ -117,6 +117,73 @@ export async function verifyPolarSignature(
   return false
 }
 
+// ---------- outbound API ----------
+
+// POLAR_API_BASE_URL exists so the integration suite can point the refund call
+// at a local mock: the money-moving path is exactly the one that must not be
+// left untested because it is inconvenient to test. Unset in production, where
+// POLAR_ENV picks sandbox or live.
+export function polarApiBase(): string {
+  const override = Deno.env.get('POLAR_API_BASE_URL')
+  if (override) return override.replace(/\/$/, '')
+  return Deno.env.get('POLAR_ENV') === 'sandbox' ? 'https://sandbox-api.polar.sh' : 'https://api.polar.sh'
+}
+
+export interface RefundResult {
+  ok: boolean
+  refundId?: string
+  // Set when ok is false. Surfaced to the buyer only as a generic failure —
+  // this string is for logs and the owner alert, never for the browser.
+  error?: string
+  // True when Polar says this order can no longer be refunded (already
+  // refunded, or outside its window). Distinguished because it is NOT a
+  // transient failure and must not invite a retry.
+  permanent?: boolean
+}
+
+// Issues a full refund for an order. `reason` is Polar's own enum, which is
+// deliberately narrower than ours: every buyer-initiated refund is a
+// customer_request as far as the processor is concerned, and our richer reason
+// lives in refund_requests where it is useful to us.
+//
+// revoke_benefits is true so Polar tears down anything it granted; Orchestra's
+// own entitlement still comes off the order.refunded webhook, not from here.
+export async function createRefund(opts: {
+  apiKey: string
+  orderId: string
+  amountCents: number
+  comment?: string
+}): Promise<RefundResult> {
+  try {
+    const res = await fetch(`${polarApiBase()}/v1/refunds/`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
+      // A hung processor must not hold the request open until the platform
+      // kill — the buyer is watching a spinner over their own money.
+      signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({
+        order_id: opts.orderId,
+        reason: 'customer_request',
+        amount: opts.amountCents,
+        revoke_benefits: true,
+        ...(opts.comment ? { comment: opts.comment.slice(0, 500) } : {}),
+      }),
+    })
+
+    if (res.ok) {
+      const body = await res.json().catch(() => ({}))
+      return { ok: true, refundId: typeof body?.id === 'string' ? body.id : undefined }
+    }
+
+    const text = await res.text().catch(() => '')
+    // 422 is Polar's validation failure — nothing refundable left, amount too
+    // large, order not refundable. Retrying cannot help.
+    return { ok: false, error: `${res.status} ${text.slice(0, 300)}`, permanent: res.status === 422 || res.status === 404 }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export interface PolarEvent {
   eventType: string
   // order.*: the order id (the idempotency scope for licenses);

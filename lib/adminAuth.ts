@@ -6,7 +6,14 @@
 // Secure over HTTPS — production only, since local dev runs plain HTTP.
 export const SESSION_COOKIE =
   process.env.NODE_ENV === 'production' ? '__Secure-orchestra_admin' : 'orchestra_admin'
-export const SESSION_HOURS = 24 * 7
+
+// Was 24 * 7. Shortened once /admin began showing customer emails, order
+// history and the free-text reasons people gave for refunding: a week-long
+// bearer cookie on a laptop is a poor guard for that, and re-entering a
+// password plus a TOTP code once a shift is a small price. Long enough that a
+// working session is never interrupted, short enough that a stolen or
+// forgotten one dies the same day.
+export const SESSION_HOURS = 12
 
 function constantTimeEqual(a: string, b: string): boolean {
   const len = Math.max(a.length, b.length)

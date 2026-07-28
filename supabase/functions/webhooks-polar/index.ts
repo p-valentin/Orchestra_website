@@ -215,6 +215,26 @@ async function notifyRefund(
     })
   }
 
+  // If the buyer refunded themselves from /account, they told us why. Fetch it
+  // so the owner gets ONE message containing both the money and the reason,
+  // rather than two arriving out of order. Absent means the refund came from
+  // Polar's dashboard or a chargeback — itself worth saying.
+  let reason: string | null = null
+  let detail: string | null = null
+  if (event.orderId) {
+    const { data: request } = await supabase
+      .from('refund_requests')
+      .select('reason, detail')
+      .eq('order_id', event.orderId)
+      .neq('status', 'failed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (request?.[0]) {
+      reason = request[0].reason
+      detail = request[0].detail
+    }
+  }
+
   // The owner gets told regardless of whether the buyer could be — an
   // unattributable refund is exactly the case worth a human looking at.
   await sendOwnerRefundNotice({
@@ -224,6 +244,8 @@ async function notifyRefund(
     accountEmail,
     amountCents: event.amountCents,
     currency: event.currency,
+    reason,
+    detail,
   })
 }
 

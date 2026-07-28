@@ -41,6 +41,20 @@ export function totpEnabled(): boolean {
   return Boolean(raw && base32Decode(raw))
 }
 
+// Customer data — purchase history, buyer addresses, the reasons people gave
+// for refunding — is gated on a second factor in production. A single shared
+// password is an acceptable guard for release notes and download counts; it is
+// not an acceptable guard for someone's email address and the sentence they
+// wrote when they asked for their money back.
+//
+// This deliberately does NOT gate the whole admin area. Locking the owner out
+// of releases and blog posts because a TOTP secret went missing would be a
+// self-inflicted outage; hiding one section until 2FA exists is the fail-safe
+// direction. Local development is exempt so the section can be worked on.
+export function sensitiveDataUnlocked(): boolean {
+  return process.env.NODE_ENV !== 'production' || totpEnabled()
+}
+
 // True when the code matches the current step or its immediate neighbours
 // (allows for clock skew and typing near a step boundary).
 export function verifyTotp(code: string): boolean {

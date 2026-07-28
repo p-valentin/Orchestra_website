@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabaseBrowser'
+import RefundRequest from '@/components/RefundRequest'
 import { AuthButton, AuthError, AuthField } from '@/components/AuthShell'
 import BuyButton from '@/components/BuyButton'
 
@@ -332,6 +333,19 @@ export default function AccountPanel() {
               Purchased {shortDate(activeLicense.purchased_at)}. Sign in inside Orchestra with this
               email and it just works — no key to enter.
             </p>
+            {/* Renders itself only inside the 14-day window. The server
+                re-checks eligibility before moving money, so this is a
+                courtesy, never the control. */}
+            <RefundRequest
+              purchasedAt={activeLicense.purchased_at}
+              onRefunded={() =>
+                setLicenses((prev) =>
+                  prev.map((l) =>
+                    l.purchased_at === activeLicense.purchased_at ? { ...l, status: 'refunded' } : l,
+                  ),
+                )
+              }
+            />
           </div>
         ) : deadLicense ? (
           <div className="space-y-2">

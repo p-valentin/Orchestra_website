@@ -253,6 +253,7 @@ export interface TestKeys {
   entitlementPublicJwk: JWK
   paddleWebhookSecret: string
   polarWebhookSecret: string
+  adminDataSecret: string
 }
 
 export async function loadTestKeys(): Promise<TestKeys> {

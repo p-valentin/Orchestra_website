@@ -23,7 +23,15 @@ Every account gets a **14-day free trial** of the complete product — no card r
 
 ## How to request a refund
 
-Because your purchase is processed by Polar — the seller of record for the transaction — refunds are issued through them. To request one, either:
+For the first **14 days** after you buy, you can refund yourself from your account page — no email, no waiting on us:
+
+1. Sign in at [orchestra-automation.com/account](https://orchestra-automation.com/account)
+2. Under **License**, choose **Request a refund**
+3. Tell us what pushed you to ask (it genuinely shapes what we build next), and confirm
+
+The money goes back to your original payment method straight away. Your license stops working; the flows you built stay on your machine, and any Playwright code Orchestra exported remains yours.
+
+After 14 days, or if the button isn't there for any reason:
 
 - Email us at [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com) and we'll arrange it, or
 - Contact Polar directly using the receipt they emailed you.
