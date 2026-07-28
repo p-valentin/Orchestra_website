@@ -331,3 +331,31 @@ globalThis.addEventListener('unload', () => {
     mockServer.shutdown()
   } catch { /* already gone */ }
 })
+
+Deno.test('70r. a licence with no stored Polar order is not self-refundable', async () => {
+  // Paddle-era purchases (and anything predating the event store) have no
+  // order.paid event to read an amount from. The buyer must get an honest
+  // "needs a human", NOT "try again shortly" for something that will never
+  // work — and no failed row should be left behind to clutter the admin view.
+  resetMock()
+  const user = await createTestUser(uniqueEmail('r70'))
+  const order = `txn_legacy_${crypto.randomUUID().slice(0, 8)}`
+  const { data: lic } = await admin.from('licenses').insert({
+    order_id: order, buyer_email: user.email, user_id: user.id,
+    status: 'active', plan: 'lifetime',
+  }).select('id').single()
+  try {
+    const res = await callFn('refund-request', { token: user.accessToken, body: { reason: 'bugs' } })
+    assertEquals(res.status, 409)
+    assertEquals(res.body.error, 'not_self_refundable')
+    assertEquals(mock.calls.length, 0, 'the provider must not be called without a known amount')
+
+    const { data: rr } = await admin.from('refund_requests').select('id').eq('license_id', lic!.id)
+    assertEquals(rr!.length, 0, 'no stray failed row for a licence that was never refundable')
+
+    const { data: after } = await admin.from('licenses').select('status').eq('id', lic!.id).single()
+    assertEquals(after!.status, 'active')
+  } finally {
+    await cleanup([order], [user.id])
+  }
+})

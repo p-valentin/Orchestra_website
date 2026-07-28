@@ -89,6 +89,29 @@ Deno.serve(async (req) => {
     return errorResponse(503, 'refunds_unavailable')
   }
 
+  // The amount comes from the stored order.paid event, never from the request
+  // body. No stored event means this licence did not come from Polar — a
+  // Paddle-era purchase, or one predating the event store — and cannot be
+  // refunded through Polar's API at all.
+  //
+  // Checked BEFORE the guard row is written, so an un-refundable licence does
+  // not leave a `failed` row behind, and the buyer gets an honest "this needs a
+  // human" rather than "try again shortly" for something that will never work.
+  const { data: order } = await supabase
+    .from('webhook_events')
+    .select('payload')
+    .eq('provider', 'polar')
+    .eq('event_name', 'order.paid')
+    .eq('payload->data->>id', license.order_id)
+    .order('received_at', { ascending: false })
+    .limit(1)
+  const amountCents = Number(order?.[0]?.payload?.data?.total_amount)
+  const currency = order?.[0]?.payload?.data?.currency ?? null
+  if (!Number.isFinite(amountCents) || amountCents < 1) {
+    console.error(`[refund] no stored Polar order for ${license.order_id} — not self-refundable`)
+    return errorResponse(409, 'not_self_refundable')
+  }
+
   // Claim the licence for refunding. The partial unique index means exactly one
   // of any number of concurrent callers gets past this line.
   const { data: request, error: insertErr } = await supabase
@@ -107,34 +130,6 @@ Deno.serve(async (req) => {
     if (insertErr.code === '23505') return errorResponse(409, 'already_requested')
     console.error('[refund] request insert failed:', insertErr.message)
     return errorResponse(500, 'internal_error')
-  }
-
-  // Amount comes from the stored order, never from the request body.
-  const { data: order } = await supabase
-    .from('webhook_events')
-    .select('payload')
-    .eq('provider', 'polar')
-    .eq('event_name', 'order.paid')
-    .eq('payload->data->>id', license.order_id)
-    .order('received_at', { ascending: false })
-    .limit(1)
-  const amountCents = Number(order?.[0]?.payload?.data?.total_amount)
-  const currency = order?.[0]?.payload?.data?.currency ?? null
-  if (!Number.isFinite(amountCents) || amountCents < 1) {
-    // Without a trustworthy amount we will not guess. Release the guard so the
-    // buyer can retry once the event is available, and tell the owner.
-    await supabase.from('refund_requests')
-      .update({ status: 'failed', failure_reason: 'order amount unavailable' })
-      .eq('id', request.id)
-    console.error(`[refund] no stored amount for order ${license.order_id}`)
-    await sendOwnerRefundFailure({
-      orderId: license.order_id,
-      buyerEmail: license.buyer_email,
-      reason,
-      detail,
-      error: 'order amount unavailable — refund not attempted',
-    })
-    return errorResponse(503, 'refunds_unavailable')
   }
 
   const result = await createRefund({
