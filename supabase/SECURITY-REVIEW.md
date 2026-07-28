@@ -20,12 +20,23 @@ and `claim-legacy`, so unauthenticated calls are rejected at the gateway before
 the function runs. → tests: entitlement 9 (401), isolation suite.
 
 **2. RLS scopes every direct table read to `auth.uid()`, and forbids writes.**
-`licenses`, `devices`, `trials` each have exactly one policy — `select … using
-(user_id = auth.uid())` — and **no** insert/update/delete policy, so the
-`authenticated` role can read only its own rows and write none. `webhook_events`
-has no policy at all (service-role only). The `authenticated` grant is
-`SELECT`-only; `anon` gets nothing. → tests: rls 19–20, trials RLS, isolation
-"direct table reads".
+`licenses`, `devices`, `trials`, `refund_requests` each have exactly one
+policy — `select … using (user_id = auth.uid())` — and **no**
+insert/update/delete policy, so the `authenticated` role can read only its own
+rows and write none. `webhook_events` has no policy at all (service-role only).
+The `authenticated` grant is `SELECT`-only; `anon` gets nothing. → tests:
+rls 19–20, trials RLS, isolation "direct table reads", refund-request 69r.
+
+> **Corrected 2026-07-28.** That last sentence was *aspirational* in
+> production, not true: every table in `public` carried
+> INSERT/UPDATE/DELETE/TRUNCATE for both `anon` and `authenticated`, because
+> Supabase's ALTER DEFAULT PRIVILEGES grants them at table creation and 0001's
+> later `grant select` **added to** that set rather than replacing it. Nothing
+> was exploitable — RLS was enabled everywhere with only SELECT policies, so
+> every write was already denied — but this section claimed two independent
+> layers where production had one. `0007_tighten_grants.sql` revokes the
+> surplus and makes the second layer real. Any future migration creating a
+> table in `public` must end with the same revoke/grant pair.
 
 **3. Email auto-claim only fires for the caller's OWN confirmed email.**
 `entitlement` attaches an unclaimed license when `buyer_email == user.email`.
