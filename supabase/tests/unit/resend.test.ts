@@ -9,6 +9,7 @@ import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1'
 import {
   claimEmailHtml,
   claimEmailText,
+  ownerRefundNoticeText,
   refundEmailHtml,
   refundEmailText,
 } from '../../functions/_shared/resend.ts'
@@ -98,4 +99,46 @@ Deno.test('both emails ship a text and an html part with matching intent', () =>
   assertStringIncludes(h, '<!doctype html>')
   // The plain part must be genuinely plain — no tags leaking into it.
   assert(!/<[a-z]+[ >]/i.test(t), 'text part must not contain markup')
+})
+
+Deno.test('claimed email does not enumerate absent steps', () => {
+  // "no key to copy", "nothing to activate" — listing what the buyer does NOT
+  // have to do invites them to wonder whether some step exists after all.
+  const text = claimEmailText('R', { claimed: true })
+  const html = claimEmailHtml('R', { claimed: true })
+  for (const body of [text, html]) {
+    assert(!/no key to copy/i.test(body))
+    assert(!/nothing to activate/i.test(body))
+  }
+  assertStringIncludes(text, 'is active and already attached')
+})
+
+Deno.test('owner refund notice carries what a human needs to triage it', () => {
+  const t = ownerRefundNoticeText({
+    orderId: 'ord_9',
+    reference: 'ORCH-0002',
+    buyerEmail: 'buyer@example.test',
+    accountEmail: 'account@example.test',
+    amountCents: 14900,
+    currency: 'usd',
+  })
+  assertStringIncludes(t, '$149.00')
+  assertStringIncludes(t, 'ORCH-0002')
+  assertStringIncludes(t, 'ord_9')
+  assertStringIncludes(t, 'buyer@example.test')
+  assertStringIncludes(t, 'account@example.test')
+  assertStringIncludes(t, 'chargeback')
+})
+
+Deno.test('owner refund notice degrades readably when fields are missing', () => {
+  const t = ownerRefundNoticeText({
+    orderId: 'ord_10',
+    reference: null,
+    buyerEmail: '',
+    accountEmail: null,
+  })
+  assert(!/null|undefined|NaN/.test(t), 'no placeholder leakage in an ops mail')
+  assertStringIncludes(t, '(none)')
+  assertStringIncludes(t, '(none on record)')
+  assertStringIncludes(t, 'unclaimed')
 })

@@ -56,9 +56,12 @@ export function claimEmailText(reference: string | null, opts: ClaimEmailOptions
   const lines: string[] = ['Thanks for buying Orchestra!', '']
 
   if (opts.claimed) {
+    // Deliberately does NOT enumerate what the buyer doesn't have to do ("no
+    // key to copy", "nothing to activate"). Listing absent steps invites the
+    // reader to wonder whether some step exists after all; stating that it is
+    // active and how to open it is the whole message.
     lines.push(
-      'Your lifetime license is active and already attached to this account —',
-      'there is no key to copy and nothing to activate.',
+      'Your lifetime license is active and already attached to this account.',
       '',
       'Just open Orchestra and sign in with this email address.',
       '',
@@ -103,7 +106,7 @@ export function claimEmailHtml(reference: string | null, opts: ClaimEmailOptions
     ? `
         <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#f3eee2;">
           Your <strong style="color:#eed9a4;">lifetime license is active</strong> and already attached to
-          this account. There is no key to copy and nothing to activate.
+          this account.
         </p>
         <p style="margin:0 0 28px;font-size:16px;line-height:1.6;color:#a59c88;">
           Just open Orchestra and sign in with this email address.
@@ -291,6 +294,57 @@ export async function sendRefundEmail(
   opts: ClaimEmailOptions = {},
 ): Promise<boolean> {
   return await send(to, 'Your Orchestra refund is confirmed', refundEmailText(reference, opts), refundEmailHtml(reference, opts))
+}
+
+export interface OwnerRefundNotice {
+  orderId: string
+  reference: string | null
+  buyerEmail: string
+  accountEmail: string | null
+  amountCents?: number | null
+  currency?: string | null
+}
+
+// Owner-facing refund alert. Deliberately plain text and deliberately terse:
+// this is an operational notification to one inbox, not a customer email, and
+// it should be skimmable on a phone. Goes to OWNER_EMAIL, falling back to the
+// support address.
+//
+// Refunds are the one payment event worth an unprompted ping — a purchase is
+// good news that the dashboard already records, while a refund may be a
+// dissatisfied buyer, a chargeback, or a bug, and all three want a human
+// looking sooner rather than at month end.
+export function ownerRefundNoticeText(n: OwnerRefundNotice): string {
+  const amount = formatAmount(n.amountCents, n.currency)
+  return [
+    'A licence was refunded and is now deactivated.',
+    '',
+    `Amount:    ${amount ?? '(not reported)'}`,
+    `Reference: ${n.reference ?? '(none)'}`,
+    `Order id:  ${n.orderId}`,
+    `Buyer:     ${n.buyerEmail || '(none on record)'}`,
+    `Account:   ${n.accountEmail ?? '(unclaimed — licence was never attached)'}`,
+    '',
+    `Admin: ${SITE_URL}/admin`,
+    '',
+    'The buyer has been emailed a refund confirmation. No action needed unless',
+    'this looks wrong — a refund you did not initiate may be a chargeback.',
+  ].join('\n')
+}
+
+export async function sendOwnerRefundNotice(n: OwnerRefundNotice): Promise<boolean> {
+  const to = Deno.env.get('OWNER_EMAIL') ?? SUPPORT_EMAIL
+  const text = ownerRefundNoticeText(n)
+  const amount = formatAmount(n.amountCents, n.currency)
+  return await send(
+    to,
+    `Orchestra refund — ${amount ?? 'amount unknown'} — ${n.reference ?? n.orderId}`,
+    text,
+    // Plain content in a <pre> keeps the operational mail readable in clients
+    // that insist on rendering the HTML part, without maintaining a second
+    // layout for an internal notice.
+    `<pre style="font:14px/1.6 ui-monospace,Menlo,monospace;white-space:pre-wrap;">${esc(text)}</pre>`,
+  )
 }
 
 export async function sendClaimEmail(

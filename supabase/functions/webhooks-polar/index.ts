@@ -23,7 +23,7 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { errorResponse, json, serviceClient } from '../_shared/http.ts'
 import { parsePolarEvent, polarSignatureHeaders, verifyPolarSignature, type PolarEvent } from '../_shared/polar.ts'
-import { sendClaimEmail, sendRefundEmail } from '../_shared/resend.ts'
+import { sendClaimEmail, sendOwnerRefundNotice, sendRefundEmail } from '../_shared/resend.ts'
 import { markProcessed, pruneOldEvents, releaseEvent, storeEvent } from '../_shared/webhook-events.ts'
 
 const PROVIDER = 'polar'
@@ -201,13 +201,27 @@ async function notifyRefund(
   revoked: RevokedLicense,
   event: PolarEvent,
 ): Promise<void> {
-  let to = revoked.buyer_email
+  let accountEmail: string | null = null
   if (revoked.user_id) {
     const { data: acct, error } = await supabase.auth.admin.getUserById(revoked.user_id)
-    if (!error && acct?.user?.email) to = acct.user.email
+    if (!error && acct?.user?.email) accountEmail = acct.user.email
   }
-  if (!to) return // refund-first row with no email on it: nobody to tell
-  await sendRefundEmail(to, event.invoiceNumber ?? event.orderId, {
+
+  const to = accountEmail ?? revoked.buyer_email
+  if (to) {
+    await sendRefundEmail(to, event.invoiceNumber ?? event.orderId, {
+      amountCents: event.amountCents,
+      currency: event.currency,
+    })
+  }
+
+  // The owner gets told regardless of whether the buyer could be — an
+  // unattributable refund is exactly the case worth a human looking at.
+  await sendOwnerRefundNotice({
+    orderId: event.orderId ?? '(unknown)',
+    reference: event.invoiceNumber,
+    buyerEmail: revoked.buyer_email,
+    accountEmail,
     amountCents: event.amountCents,
     currency: event.currency,
   })
