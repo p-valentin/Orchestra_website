@@ -25,6 +25,9 @@ function friendlyLoadError(raw: string): string {
 // goes through the devices Edge Function, which scopes by the caller's JWT.
 
 type License = { status: string; plan: string; purchased_at: string }
+// A refund request that is not `failed` — i.e. one that has been issued or is
+// still settling. Read under RLS, so only ever the caller's own.
+type RefundRequest = { status: string; created_at: string }
 type Trial = { started_at: string; ends_at: string }
 type Device = {
   id: string
@@ -182,6 +185,7 @@ export default function AccountPanel() {
   const [confirming, setConfirming] = useState<Device | null>(null)
   const [awaitingPurchase, setAwaitingPurchase] = useState(false)
   const [alreadyOwned, setAlreadyOwned] = useState(false)
+  const [refundRequest, setRefundRequest] = useState<RefundRequest | null>(null)
   const dialogTriggerRef = useRef<HTMLElement | null>(null)
   const dialogCancelRef = useRef<HTMLButtonElement | null>(null)
   const dialogConfirmRef = useRef<HTMLButtonElement | null>(null)
@@ -197,6 +201,16 @@ export default function AccountPanel() {
           .select('id, name, platform, app_version, last_seen_at')
           .is('revoked_at', null)
           .order('last_seen_at', { ascending: false }),
+        // A refund issued moments ago leaves the licence `active` until the
+        // provider's webhook lands. Without this the button would come back on
+        // a page reload in that window, and a second click would be refused
+        // with an error the buyer did nothing to deserve.
+        sb
+          .from('refund_requests')
+          .select('status, created_at')
+          .neq('status', 'failed')
+          .order('created_at', { ascending: false })
+          .limit(1),
       ])
 
     ;(async () => {
@@ -209,7 +223,7 @@ export default function AccountPanel() {
       if (cancelled) return
       setEmail(data.session.user.email ?? null)
 
-      let [lic, tri, dev] = await load(sb)
+      let [lic, tri, dev, ref] = await load(sb)
       let failed = lic.error ?? tri.error ?? dev.error
       // A stale or clock-skewed token can make PostgREST reject the read
       // ("JWT ..."). Mint a fresh one and retry once before giving up — this
@@ -219,7 +233,7 @@ export default function AccountPanel() {
         const { data: refreshed } = await sb.auth.refreshSession()
         if (cancelled) return
         if (refreshed?.session) {
-          ;[lic, tri, dev] = await load(sb)
+          ;[lic, tri, dev, ref] = await load(sb)
           failed = lic.error ?? tri.error ?? dev.error
         }
       }
@@ -228,6 +242,7 @@ export default function AccountPanel() {
       setLicenses(lic.data ?? [])
       setTrial(tri.data ?? null)
       setDevices(dev.data ?? [])
+      setRefundRequest(ref.data?.[0] ?? null)
       setLoading(false)
     })().catch(() => {
       if (!cancelled) {
@@ -354,13 +369,19 @@ export default function AccountPanel() {
                 courtesy, never the control. */}
             <RefundRequest
               purchasedAt={activeLicense.purchased_at}
-              onRefunded={() =>
+              existingRequest={refundRequest}
+              onRefunded={() => {
+                // Optimistic: the provider has taken the money, but the licence
+                // stays `active` until order.refunded arrives. Record both so
+                // neither the button nor a stale "active" pill misleads anyone
+                // in the seconds between.
+                setRefundRequest({ status: 'refunded', created_at: new Date().toISOString() })
                 setLicenses((prev) =>
                   prev.map((l) =>
                     l.purchased_at === activeLicense.purchased_at ? { ...l, status: 'refunded' } : l,
                   ),
                 )
-              }
+              }}
             />
           </div>
         ) : deadLicense ? (

@@ -44,9 +44,13 @@ export function daysLeft(purchasedAt: string, now: number = Date.now()): number 
 
 export default function RefundRequest({
   purchasedAt,
+  existingRequest,
   onRefunded,
 }: {
   purchasedAt: string
+  // A refund already issued (or still settling) for this licence. Non-null
+  // means the button is gone for good — there is nothing left to refund.
+  existingRequest: { status: string } | null
   onRefunded: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -74,6 +78,21 @@ export default function RefundRequest({
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open, busy])
+
+  // Already refunded. The licence can still read `active` for a few seconds
+  // while the provider's webhook is in flight, so this — not the licence
+  // status — is what retires the button. Without it a reload inside that
+  // window would offer a second refund and then refuse it with an error the
+  // buyer did nothing to cause.
+  if (existingRequest) {
+    return (
+      <p className="mt-3 text-sm text-muted">
+        {existingRequest.status === 'refunded'
+          ? 'Refunded. Your licence is being deactivated and the money is on its way back to your original payment method — banks usually take 5–10 business days.'
+          : 'A refund is being processed for this licence.'}
+      </p>
+    )
+  }
 
   if (left <= 0) return null
 
