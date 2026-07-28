@@ -20,19 +20,22 @@ import {
   deleteTestUser,
   importLegacyPrivateKeyPkcs8B64,
   loadTestKeys,
+  postPolarWebhook,
   randomFingerprint,
   requireStack,
   seedLicense,
   signLegacyToken,
+  signPolarWebhook,
   uniqueEmail,
   userClient,
 } from '../helpers.ts'
 
 requireStack()
 const admin = adminClient()
+const testKeys = await loadTestKeys()
 // The private key that pairs with the LEGACY_SIGNING_KEY the functions run
 // with (same source claim-legacy.test.ts uses) so the token actually verifies.
-const legacyKey = await importLegacyPrivateKeyPkcs8B64((await loadTestKeys()).legacyPrivateKeyPkcs8B64)
+const legacyKey = await importLegacyPrivateKeyPkcs8B64(testKeys.legacyPrivateKeyPkcs8B64)
 
 function body(fingerprint: string, extra: Record<string, unknown> = {}) {
   return { fingerprint, device_name: 'atk', platform: 'linux', app_version: '1.4.0', ...extra }
@@ -170,6 +173,98 @@ Deno.test('isolation: direct table reads under B’s token never return A’s ro
     assertEquals((await asBob.from('licenses').select('id').eq('id', aliceLicense)).data!.length, 0)
   } finally {
     await admin.from('licenses').delete().eq('id', aliceLicense)
+    await deleteTestUser(alice.id)
+    await deleteTestUser(bob.id)
+  }
+})
+
+// ---------- provider webhook (Polar) ----------
+//
+// The webhook writes with the service role, so RLS does not protect it — the
+// attach guard does. These two cases sit at that boundary: a signed delivery
+// is authentic, but authenticity says nothing about WHOSE account the order
+// belongs on. Attribution comes from metadata.user_id and nothing else, and it
+// is one-way: it can fill an empty slot, never re-point a filled one.
+
+async function deliverPolar(raw: string) {
+  return await postPolarWebhook(raw, await signPolarWebhook(testKeys.polarWebhookSecret, raw))
+}
+
+function polarOrderPaid(orderId: string, email: string, userId?: string) {
+  return JSON.stringify({
+    type: 'order.paid',
+    timestamp: new Date().toISOString(),
+    data: {
+      id: orderId,
+      status: 'paid',
+      paid: true,
+      billing_reason: 'purchase',
+      subscription_id: null,
+      customer_id: 'cus_iso',
+      customer: { id: 'cus_iso', email },
+      metadata: userId ? { user_id: userId } : {},
+    },
+  })
+}
+
+Deno.test('isolation: a Polar order cannot re-point an already-claimed license to another account', async () => {
+  // Alice bought and owns the license. A later delivery for the SAME order id
+  // carrying Bob's user_id — a replayed or tampered-then-resigned payload, or
+  // simply a dashboard resend after Bob got hold of the order id — must not
+  // move it. The attach is guarded on `user_id IS NULL`, so a filled slot is
+  // final.
+  const alice = await createTestUser(uniqueEmail('iso-pl-alice'))
+  const bob = await createTestUser(uniqueEmail('iso-pl-bob'))
+  const order = `ord_iso_${crypto.randomUUID().slice(0, 8)}`
+  try {
+    assertEquals((await deliverPolar(polarOrderPaid(order, alice.email, alice.id))).status, 200)
+    const { data: owned } = await admin.from('licenses').select('user_id').eq('order_id', order).single()
+    assertEquals(owned!.user_id, alice.id)
+
+    // Bob's attempt: same order, his id.
+    assertEquals((await deliverPolar(polarOrderPaid(order, bob.email, bob.id))).status, 200)
+
+    const { data: after } = await admin.from('licenses').select('user_id, buyer_email').eq('order_id', order).single()
+    assertEquals(after!.user_id, alice.id, 'the license must stay with Alice')
+    assertEquals(after!.buyer_email, alice.email, 'and must not be relabelled to Bob')
+
+    const { data: bobLic } = await admin.from('licenses').select('id').eq('user_id', bob.id)
+    assertEquals(bobLic!.length, 0, 'Bob must hold nothing')
+  } finally {
+    await admin.from('licenses').delete().eq('order_id', order)
+    await admin.from('webhook_events').delete().eq('provider', 'polar').eq('payload->data->>id', order)
+    await deleteTestUser(alice.id)
+    await deleteTestUser(bob.id)
+  }
+})
+
+Deno.test('isolation: a webhook-created license for A is invisible to B', async () => {
+  // The seeded-row cases above prove RLS; this proves the row the WEBHOOK
+  // writes (service role, bypassing RLS on the way in) is scoped the same way
+  // on the way out.
+  const alice = await createTestUser(uniqueEmail('iso-plr-alice'))
+  const bob = await createTestUser(uniqueEmail('iso-plr-bob'))
+  const order = `ord_iso_${crypto.randomUUID().slice(0, 8)}`
+  try {
+    assertEquals((await deliverPolar(polarOrderPaid(order, alice.email, alice.id))).status, 200)
+
+    const asBob = userClient(bob.accessToken)
+    assertEquals((await asBob.from('licenses').select('id')).data!.length, 0)
+    assertEquals((await asBob.from('licenses').select('id').eq('order_id', order)).data!.length, 0)
+
+    // And Bob's own entitlement call still resolves to his trial, not Alice's
+    // purchase.
+    const res = await callFn('entitlement', { token: bob.accessToken, body: body(randomFingerprint()) })
+    assertEquals(res.status, 200)
+    const { data: bobLic } = await admin.from('licenses').select('id').eq('user_id', bob.id)
+    assertEquals(bobLic!.length, 0)
+
+    // Alice still sees exactly her one license.
+    const asAlice = userClient(alice.accessToken)
+    assertEquals((await asAlice.from('licenses').select('id')).data!.length, 1)
+  } finally {
+    await admin.from('licenses').delete().eq('order_id', order)
+    await admin.from('webhook_events').delete().eq('provider', 'polar').eq('payload->data->>id', order)
     await deleteTestUser(alice.id)
     await deleteTestUser(bob.id)
   }

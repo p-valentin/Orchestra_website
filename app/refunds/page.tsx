@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 // providers' domain verification wants a visible, distinct refund policy).
 
 const REFUNDS = `
-Orchestra is a one-time purchase, sold through our payment provider (merchant of record). This page explains how refunds work and how to request one. Questions any time: [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
+Orchestra is a one-time purchase, sold through Polar (our merchant of record). This page explains how refunds work and how to request one. Questions any time: [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com).
 
 ## Try it free first
 
@@ -23,10 +23,18 @@ Every account gets a **14-day free trial** of the complete product — no card r
 
 ## How to request a refund
 
-Because your purchase is processed by our payment provider (merchant of record) — the seller of record for the transaction — refunds are issued through them. To request one, either:
+For the first **14 days** after you buy, you can refund yourself from your account page — no email, no waiting on us:
+
+1. Sign in at [orchestra-automation.com/account](https://orchestra-automation.com/account)
+2. Under **License**, choose **Request a refund**
+3. Tell us what pushed you to ask (it genuinely shapes what we build next), and confirm
+
+The money goes back to your original payment method straight away. Your license stops working; the flows you built stay on your machine, and any Playwright code Orchestra exported remains yours.
+
+After 14 days, or if the button isn't there for any reason:
 
 - Email us at [hello@orchestra-automation.com](mailto:hello@orchestra-automation.com) and we'll arrange it, or
-- Contact our payment provider directly using the receipt they emailed you.
+- Contact Polar directly using the receipt they emailed you.
 
 Refund eligibility is determined by our payment provider's applicable buyer terms together with the rights below. We aim to respond to any refund request within a day or two.
 

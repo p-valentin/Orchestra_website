@@ -5,7 +5,7 @@ description: Short answers to common questions.
 
 ## Is Orchestra free?
 
-Orchestra is currently **free to download and use** — grab it from the [downloads page](/downloads), everything included. Follow the [blog](/blog) for news on where it's headed.
+No. There's a **14-day free trial** with every feature unlocked and no card required. After that, Orchestra is a one-time **$149** license: no subscription, no per-run fees, and it covers the updates that follow. The app is on the [downloads page](/downloads); [pricing](/#pricing) has the details.
 
 ## What do I need to run it?
 
@@ -17,7 +17,7 @@ No. Flows are built visually, and [recording](/docs/recording) writes the steps 
 
 ## Does it work on any website?
 
-Orchestra drives a real Chromium browser, so anything that works in Chrome works in the embedded browser: logins, iframes, multi-tab flows, file uploads. Two honest caveats: sites with serious anti-bot protection may still detect automation (the [human-like instruments](/docs/instruments/human-like) help but aren't magic), and heavily obfuscated pages can make [stable selectors](/docs/selectors) harder to find.
+Orchestra drives a real Chromium browser, so anything that works in Chrome works in the embedded browser: logins, iframes, multi-tab flows, file uploads. Two honest caveats: some sites detect and block automated sessions regardless of the [session & environment instruments](/docs/instruments/session-environment), and heavily obfuscated pages can make [stable selectors](/docs/selectors) harder to find.
 
 ## Is my data private?
 
@@ -31,9 +31,9 @@ Yes. Exports are plain Playwright scripts with no dependency on Orchestra — ru
 
 Send them the workspace `.json` file ([Workspaces](/docs/workspaces)). When they open it, Orchestra's import safety scan shows any code-execution steps inside before anything loads — so make an honest flow and it's a two-click import.
 
-## Is web scraping legal?
+## What am I responsible for when I automate a site?
 
-That depends on what you scrape, where you live, and the site's terms — Orchestra is a tool, and how you use it is your responsibility. Respect sites' terms of service, rate limits and robots conventions, and be especially careful with personal data.
+Everything your automations do. What's legal depends on what you scrape, where you live, and the site's terms — Orchestra is a tool, and how you use it is your responsibility. Respect sites' terms of service, rate limits and robots conventions, and be especially careful with personal data. Our [Acceptable Use Policy](/acceptable-use) spells this out.
 
 ## How do updates work?
 

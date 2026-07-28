@@ -111,6 +111,8 @@ const seededLicenseIds = new Set<string>()
 const fingerprints = new Map<string, string>() // `${email}|${device_name}` → stable fingerprint
 const paddleTxnIds = new Set<string>() // transactions simulated via send_paddle_webhook
 const paddleEventIds = new Set<string>() // webhook_events rows those calls created
+const polarOrderIds = new Set<string>() // orders simulated via send_polar_webhook
+const polarEventIds = new Set<string>() // webhook_events rows those calls created
 
 function getUser(email: string): RegisteredUser {
   const user = users.get(email.toLowerCase().trim())
@@ -705,6 +707,147 @@ server.registerTool(
   }),
 )
 
+// Standard Webhooks signing, exactly as Polar does it: HMAC-SHA256 over
+// "<webhook-id>.<webhook-timestamp>.<body>", base64, keyed on the UTF-8 bytes
+// of the endpoint secret. See supabase/functions/_shared/polar.ts.
+async function signPolar(secret: string, body: string, id: string): Promise<Record<string, string>> {
+  const ts = Math.floor(Date.now() / 1000)
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  )
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${ts}.${body}`))
+  return {
+    'webhook-id': id,
+    'webhook-timestamp': String(ts),
+    'webhook-signature': `v1,${btoa(String.fromCharCode(...new Uint8Array(mac)))}`,
+  }
+}
+
+server.registerTool(
+  'send_polar_webhook',
+  {
+    description:
+      'Simulate a Polar webhook delivery, signed with POLAR_WEBHOOK_SECRET from supabase/functions/.env.test (Standard Webhooks: webhook-id/webhook-timestamp/webhook-signature) and POSTed to /webhooks-polar. Unlike Paddle there is no customer.created step — order.paid carries the buyer email inline. Pass user_id to bind the order to an account (that is the ONLY attach path; omitting it leaves the license unclaimed on purpose). Use corrupt_signature, stale_timestamp or raw_body for rejection paths, and webhook_id to replay a delivery for the idempotency check.',
+    inputSchema: {
+      event_type: z.enum(['order.paid', 'order.refunded', 'refund.succeeded', 'refund.pending', 'other'])
+        .describe("'order.paid' = a purchase; 'order.refunded'/'refund.succeeded' revoke; 'other' = an unrelated stored-only event"),
+      order_id: z.string().optional().describe('Order id — the idempotency scope for licenses'),
+      email: z.string().optional().describe('Buyer email (goes into data.customer.email)'),
+      user_id: z.string().optional().describe('Account uuid for data.metadata.user_id — the account binding'),
+      webhook_id: z.string().optional().describe('Reuse a webhook-id to simulate a retry (the dedupe key)'),
+      corrupt_signature: z.boolean().optional().describe('Send a wrong signature — must yield 401'),
+      stale_timestamp: z.boolean().optional().describe('Sign with an hour-old timestamp — must yield 401'),
+      raw_body: z.string().optional().describe('Send this exact body instead of a built payload (still correctly signed unless corrupt_signature)'),
+    },
+  },
+  tool(async ({ event_type, order_id, email, user_id, webhook_id, corrupt_signature, stale_timestamp, raw_body }: {
+    event_type: 'order.paid' | 'order.refunded' | 'refund.succeeded' | 'refund.pending' | 'other'
+    order_id?: string
+    email?: string
+    user_id?: string
+    webhook_id?: string
+    corrupt_signature?: boolean
+    stale_timestamp?: boolean
+    raw_body?: string
+  }) => {
+    const cfg = await resolveConfig()
+    const envText = await Deno.readTextFile(new URL('../functions/.env.test', import.meta.url))
+    const secret = envText.match(/^POLAR_WEBHOOK_SECRET=(.+)$/m)?.[1]?.trim()
+    if (!secret) throw new Error('POLAR_WEBHOOK_SECRET missing from supabase/functions/.env.test — run setup_test_keys')
+
+    const order = order_id ?? `ord_mcp_${crypto.randomUUID().slice(0, 8)}`
+    const buyer = email ?? 'buyer@example.test'
+
+    let body: string
+    if (raw_body !== undefined) {
+      body = raw_body
+    } else if (event_type === 'order.paid') {
+      body = JSON.stringify({
+        type: 'order.paid',
+        timestamp: new Date().toISOString(),
+        data: {
+          id: order,
+          status: 'paid',
+          paid: true,
+          billing_reason: 'purchase',
+          currency: 'usd',
+          total_amount: 14900,
+          subscription_id: null,
+          customer_id: `cus_for_${order}`,
+          customer: { id: `cus_for_${order}`, email: buyer },
+          metadata: user_id ? { user_id } : {},
+        },
+      })
+    } else if (event_type === 'order.refunded') {
+      body = JSON.stringify({
+        type: 'order.refunded',
+        timestamp: new Date().toISOString(),
+        data: {
+          id: order,
+          status: 'refunded',
+          paid: true,
+          billing_reason: 'purchase',
+          customer_id: `cus_for_${order}`,
+          customer: { id: `cus_for_${order}`, email: buyer },
+          metadata: {},
+        },
+      })
+    } else if (event_type === 'refund.succeeded' || event_type === 'refund.pending') {
+      body = JSON.stringify({
+        type: 'refund.created',
+        timestamp: new Date().toISOString(),
+        data: {
+          id: `ref_${crypto.randomUUID().slice(0, 8)}`,
+          order_id: order,
+          status: event_type === 'refund.succeeded' ? 'succeeded' : 'pending',
+          reason: 'customer_request',
+          amount: 14900,
+          currency: 'usd',
+        },
+      })
+    } else {
+      body = JSON.stringify({
+        type: 'checkout.created',
+        timestamp: new Date().toISOString(),
+        data: { id: `co_${crypto.randomUUID().slice(0, 8)}` },
+      })
+    }
+
+    const id = webhook_id ?? `msg_${crypto.randomUUID()}`
+    const headers = await signPolar(secret, body, id)
+    if (stale_timestamp) {
+      // Re-sign against an hour-old ts so the MAC is valid but the delivery is
+      // outside the replay window — the interesting rejection, not a garbage one.
+      const ts = Math.floor(Date.now() / 1000) - 3600
+      const key = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+      )
+      const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${ts}.${body}`))
+      headers['webhook-timestamp'] = String(ts)
+      headers['webhook-signature'] = `v1,${btoa(String.fromCharCode(...new Uint8Array(mac)))}`
+    }
+    if (corrupt_signature) headers['webhook-signature'] = `v1,${btoa('not-the-right-mac-at-all')}`
+
+    const res = await fetch(`${cfg.url}/functions/v1/webhooks-polar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body,
+    })
+    const text = await res.text()
+    if (res.status === 200) {
+      polarOrderIds.add(order)
+      polarEventIds.add(id)
+    }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      parsed = { raw: text }
+    }
+    return { order_id: order, webhook_id: id, delivery: { status: res.status, body: parsed } }
+  }),
+)
+
 server.registerTool(
   'cleanup_test_data',
   {
@@ -725,14 +868,18 @@ server.registerTool(
       const { data } = await adm.from('licenses').delete().in('id', [...seededLicenseIds]).select('id')
       licensesDeleted += data?.length ?? 0
     }
-    if (paddleTxnIds.size > 0) {
-      const { data } = await adm.from('licenses').delete().in('order_id', [...paddleTxnIds]).select('id')
-      licensesDeleted += data?.length ?? 0
+    for (const orderIds of [paddleTxnIds, polarOrderIds]) {
+      if (orderIds.size > 0) {
+        const { data } = await adm.from('licenses').delete().in('order_id', [...orderIds]).select('id')
+        licensesDeleted += data?.length ?? 0
+      }
     }
     let eventsDeleted = 0
-    if (paddleEventIds.size > 0) {
-      const { data } = await adm.from('webhook_events').delete().in('event_id', [...paddleEventIds]).select('id')
-      eventsDeleted = data?.length ?? 0
+    for (const eventIds of [paddleEventIds, polarEventIds]) {
+      if (eventIds.size > 0) {
+        const { data } = await adm.from('webhook_events').delete().in('event_id', [...eventIds]).select('id')
+        eventsDeleted += data?.length ?? 0
+      }
     }
     for (const id of userIds) await adm.auth.admin.deleteUser(id)
 
@@ -742,6 +889,8 @@ server.registerTool(
     fingerprints.clear()
     paddleTxnIds.clear()
     paddleEventIds.clear()
+    polarOrderIds.clear()
+    polarEventIds.clear()
     return summary
   }),
 )

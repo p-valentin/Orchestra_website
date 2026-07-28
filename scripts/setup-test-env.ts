@@ -40,6 +40,22 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
     (b) => b.toString(16).padStart(2, '0'),
   ).join('')
 
+  // Polar shows the endpoint secret as a plain string and HMACs its UTF-8
+  // bytes (see _shared/polar.ts) — so a throwaway random string is exactly
+  // what the real thing looks like. Deliberately NOT base64/whsec_-prefixed:
+  // the tests should exercise the same derivation production uses.
+  const polarWebhookSecret = 'polar_whs_test_' + Array.from(
+    crypto.getRandomValues(new Uint8Array(24)),
+    (b) => b.toString(16).padStart(2, '0'),
+  ).join('')
+
+  // The admin-data endpoint refuses secrets under 32 chars, so the test
+  // fixture has to be realistic rather than a short placeholder.
+  const adminDataSecret = Array.from(
+    crypto.getRandomValues(new Uint8Array(32)),
+    (b) => b.toString(16).padStart(2, '0'),
+  ).join('')
+
   const envFile = new URL('supabase/functions/.env.test', root)
   await Deno.writeTextFile(
     envFile,
@@ -48,6 +64,14 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
       `ENTITLEMENT_PRIVATE_KEY=${btoa(entitlement.privatePkcs8Pem)}`,
       `LEGACY_SIGNING_KEY=${btoa(legacy.publicSpkiPem)}`,
       `PADDLE_WEBHOOK_SECRET=${paddleWebhookSecret}`,
+      `POLAR_WEBHOOK_SECRET=${polarWebhookSecret}`,
+      // Refund tests point the provider call at a local mock rather than
+      // skipping the one path that moves money. host.docker.internal, NOT
+      // 127.0.0.1: the function runs inside the edge-runtime container, where
+      // loopback is the container's own — the mock listens on the host.
+      'POLAR_API_KEY=polar_oat_test_dummy',
+      'POLAR_API_BASE_URL=http://host.docker.internal:19998',
+      `ADMIN_DATA_SECRET=${adminDataSecret}`,
       // No PADDLE_API_KEY on purpose: the email lookup must resolve from
       // stored customer.* events, and the no-email path must 500-and-release
       // so Paddle's retry can succeed later.
@@ -68,6 +92,8 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
         legacyPrivateKeyPkcs8B64: legacy.privatePkcs8B64Der,
         entitlementPublicJwk: entitlement.publicJwk,
         paddleWebhookSecret,
+        polarWebhookSecret,
+        adminDataSecret,
       },
       null,
       2,

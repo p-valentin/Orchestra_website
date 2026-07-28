@@ -26,3 +26,25 @@ verify_jwt = true
 # Paddle-Signature HMAC verified inside the function.
 [functions.webhooks-paddle]
 verify_jwt = false
+
+# Same for Polar: a Standard Webhooks delivery carries no Supabase JWT.
+# Authentication is the webhook-signature HMAC verified inside the function,
+# before the body is parsed.
+[functions.webhooks-polar]
+verify_jwt = false
+
+# The browser calls refund-request cross-origin from /account, and its OPTIONS
+# preflight carries no Authorization header — gateway JWT verification would
+# 401 the preflight. The function authenticates every non-OPTIONS request
+# itself and derives the licence from the caller's own JWT, never from the
+# request body.
+[functions.refund-request]
+verify_jwt = false
+
+# Called by the WEBSITE'S SERVER, which holds no Supabase user session, so the
+# gateway has no JWT to check. Authentication is an HMAC signature over the
+# method, path, body and a timestamp, verified inside the function — see
+# _shared/admin-auth.ts for why a static bearer token was rejected. Every
+# failure returns 404, so this endpoint does not advertise itself.
+[functions.admin-data]
+verify_jwt = false

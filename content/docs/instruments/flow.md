@@ -51,7 +51,7 @@ Runs its children; if any step throws, the error is handled instead of halting t
 - **Set variable** — store the error message in a variable for later steps to inspect.
 - **Custom** — run your own JS in the catch block (the error is available as `err`). Custom catch code runs in exported scripts.
 
-Use it around steps you *expect* to fail sometimes: optional page sections, flaky endpoints, anti-bot interstitials. For a single step, the simpler [On failure: continue](/docs/modifiers) setting may be all you need.
+Use it around steps you *expect* to fail sometimes: optional page sections, flaky endpoints, unexpected interstitials. For a single step, the simpler [On failure: continue](/docs/modifiers) setting may be all you need.
 
 ## Snippet
 

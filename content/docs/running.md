@@ -32,7 +32,7 @@ Play and Step are the core of the building workflow: get the page where you want
 Two toolbar toggles slow a run down:
 
 - **Debug** — a fixed 800 ms delay between steps so you can watch what's happening.
-- **🎲 Human delay** — a random delay between actions (default 500–2000 ms, editable). This is a light bot-detection countermeasure as much as a pacing tool — see [Human-like instruments](/docs/instruments/human-like).
+- **🎲 Human delay** — a random delay between actions (default 500–2000 ms, editable). It also keeps a flow from hammering a site faster than a person would — see [Session & environment instruments](/docs/instruments/session-environment).
 
 ## The Runner window
 

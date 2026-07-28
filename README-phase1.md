@@ -1,11 +1,11 @@
 # Orchestra licensing — Phases 1, 1.5 & 2 backend
 
-Supabase backend for the $129 lifetime license: schema + RLS, entitlement
+Supabase backend for the $149 lifetime license: schema + RLS, entitlement
 issuance, device management, legacy license migration, the self-managed
-14-day trial (Phase 1.5), and Paddle payments via webhooks (Phase 2 — Paddle
-replaced Lemon Squeezy because it onboards unregistered individuals in
-Romania; the provider surface was one module by design). Desktop integration
-is Phase 3.
+14-day trial (Phase 1.5), and payments via webhooks (Phase 2). The payment
+processor has moved twice — Lemon Squeezy → Paddle → **Polar** — and each
+time the change was confined to one provider module plus its webhook handler,
+which is what the surface was designed for. Desktop integration is Phase 3.
 
 ## Layout
 
@@ -20,7 +20,8 @@ supabase/
     entitlement/                    POST /entitlement — issue 7-day EdDSA JWT
     devices/                        GET /devices, POST /devices/deactivate
     claim-legacy/                   POST /claim-legacy — redeem old-format license keys
-    webhooks-paddle/                POST /webhooks-paddle — Paddle events (public)
+    webhooks-paddle/                POST /webhooks-paddle — Paddle events (public, being retired)
+    webhooks-polar/                 POST /webhooks-polar — Polar events (public, current)
   tests/
     unit/                           pure logic, no stack needed
     integration/                    §8 cases 1–21, needs local stack
@@ -113,7 +114,95 @@ The whole matrix is also scripted: `deno run -A mcp/run-matrix.ts` (from
 `supabase/`) spawns the server on its real stdio transport and runs ~57
 checks covering every scenario above end to end.
 
-## Paddle (Phase 2)
+## Polar (Phase 2, current processor)
+
+Paddle rejected the merchant application, so the live processor is **Polar**
+(also a merchant of record). The swap touched only the provider surface —
+schema, entitlement logic, device binding and the trial are unchanged.
+`webhooks-paddle` is kept deployed until Polar is verified in sandbox, then
+deleted.
+
+`POST /functions/v1/webhooks-polar` — public (`verify_jwt = false`);
+authentication is the [Standard Webhooks](https://www.standardwebhooks.com/)
+scheme Polar implements: headers `webhook-id`, `webhook-timestamp`,
+`webhook-signature` (`v1,<base64>`, space-delimited list for rotation), HMAC-
+SHA256 over `"<id>.<ts>.<raw body>"`, verified constant-time with a 300 s
+replay window before anything is parsed. All Polar payload knowledge lives in
+`functions/_shared/polar.ts`.
+
+> **Secret gotcha.** Polar's docs say the secret "is expected to be base64
+> encoded", but their SDK base64-*encodes* the dashboard string before handing
+> it to the Standard Webhooks library, which base64-*decodes* it. The two
+> cancel out: the HMAC key is the plain UTF-8 bytes of the secret as shown in
+> the dashboard. Set `POLAR_WEBHOOK_SECRET` to that literal string — pre-
+> encoding it produces silent 401s.
+
+- **Idempotency**: keyed on the `webhook-id` **header** — unlike Paddle, the
+  Polar payload carries no event id at all. The id is inside the signed
+  content, so a captured delivery can't be replayed under a fresh id to dodge
+  the dedupe. Store-first, release-on-failure semantics live in
+  `_shared/webhook-events.ts` (same table, same 24-month retention sweep the
+  Paddle path uses).
+- **Buyer email** needs no lookup: `order.paid` carries
+  `data.customer.email` inline.
+- **Account binding is metadata-only.** `data.metadata.user_id` (set
+  server-side by `/api/checkout` from a verified JWT) is the sole attach path;
+  there is deliberately **no** email fallback here, so an email edited at
+  checkout can't misdirect a license. Absent/unresolvable → recorded
+  unclaimed and logged; the buyer recovers it by signing in, where
+  `/entitlement` auto-claims against their own confirmed address. The attach
+  is guarded on `user_id IS NULL`, so it can fill an empty slot but never
+  re-point an owned one.
+- **order.paid**: conflict-ignoring upsert on `order_id`, then attach, then
+  the claim email to the ACCOUNT's address (Resend, best-effort). An order
+  with a `subscription_id` is stored and skipped — we sell no subscriptions.
+- **Refunds**: `order.refunded` (any status, including `partially_refunded`)
+  and `refund.created`/`refund.updated` with `status: "succeeded"` both
+  revoke. Chargebacks need no branch — Polar surfaces a dispute as a Refund
+  carrying a `dispute` object. There is **no dispute-resolution webhook**, so
+  reinstating a license after a won dispute is a manual admin action. A refund
+  arriving before its purchase CREATES the row as refunded, and the late
+  purchase cannot resurrect it.
+- Unknown event types: stored, 200, no-op.
+
+New secrets: `POLAR_WEBHOOK_SECRET` (the endpoint secret from the Polar
+dashboard), `POLAR_API_KEY` + `POLAR_ENV` (self-serve refunds call Polar's API;
+the key needs the `refunds:write` scope, and `POLAR_ENV=sandbox` points it at
+sandbox-api.polar.sh), `OWNER_EMAIL`, `ADMIN_DATA_SECRET`. Website side:
+`POLAR_ACCESS_TOKEN` (server-only), `NEXT_PUBLIC_POLAR_PRODUCT_ID`,
+`NEXT_PUBLIC_POLAR_ENV`, `ADMIN_DATA_SECRET`, `ADMIN_TOTP_SECRET`.
+
+**Who gets which email.** Four templates, two audiences, and the split matters
+because the internal ones carry another customer's address and the sentence
+they wrote about why they left:
+
+| Email | Recipient | Audience |
+|---|---|---|
+| Purchase confirmation (`sendClaimEmail`) | the licence's account address | customer |
+| Refund confirmation (`sendRefundEmail`) | the licence's account address | customer |
+| Refund alert (`sendOwnerRefundNotice`) | `OWNER_EMAIL` | internal |
+| Refund FAILED (`sendOwnerRefundFailure`) | `OWNER_EMAIL` | internal |
+
+The owner address is never derived from the buyer — it is read from
+`OWNER_EMAIL` only, falling back to `SUPPORT_EMAIL`
+(`hello@orchestra-automation.com`). Keep `OWNER_EMAIL` pointed at a business
+inbox rather than a personal one: an owner address that is also a customer
+account makes the two flows indistinguishable while testing, and puts customer
+PII somewhere it does not belong.
+
+**Polar dashboard checklist**: start in the SANDBOX (sandbox.polar.sh —
+separate account, separate token and product id) · product "Orchestra
+Lifetime", one-time, $149 · Settings → Webhooks → Add Endpoint: the deployed
+function URL, format **Raw**, events `order.paid`, `order.refunded`,
+`refund.created`, `refund.updated` · copy the secret into
+`POLAR_WEBHOOK_SECRET` · do **not** enable Polar's built-in License Key
+benefit — Orchestra's account *is* the license, and a second key source would
+be a second source of truth. Test card `4242 4242 4242 4242`; never a real
+card in sandbox (Polar flags that as card testing). Go-live = the production
+Polar org's token, product id and endpoint secret, and
+`NEXT_PUBLIC_POLAR_ENV=production`.
+
+## Paddle (Phase 2, superseded — kept until Polar is verified)
 
 `POST /functions/v1/webhooks-paddle` — public (`verify_jwt = false`);
 authentication is the `Paddle-Signature` header (`ts=…;h1=…`, HMAC-SHA256

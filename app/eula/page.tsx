@@ -54,7 +54,7 @@ Orchestra automates real browsers on websites we don't control. **You** are resp
 
 ## Buying, taxes, refunds
 
-Orchestra is sold through our payment provider (merchant of record) — they are the seller of record for your purchase and their buyer terms apply at checkout. Prices are in USD; any tax is calculated and added at checkout. Refunds are handled through our payment provider, and refund eligibility is determined by their applicable policies. If you are a consumer in the EU or UK, nothing here limits your statutory 14-day right of withdrawal for digital purchases — ask them or us within that window and it will be honored. **A refunded or charged-back purchase deactivates its license.**
+Orchestra is sold through Polar (our merchant of record) — they are the seller of record for your purchase and their buyer terms apply at checkout. Prices are in USD; any tax is calculated and added at checkout. Refunds are handled through Polar, and refund eligibility is determined by their applicable policies. If you are a consumer in the EU or UK, nothing here limits your statutory 14-day right of withdrawal for digital purchases — ask them or us within that window and it will be honored. **A refunded or charged-back purchase deactivates its license.**
 
 ## Staying licensed
 

@@ -6,10 +6,11 @@
 //   NEXT_PUBLIC_ACCOUNTS_ENABLED=1  opens the whole account area (sign-up,
 //                                   sign-in, and /account)
 //
-// PAID_ENABLED is a deliberate "go live" switch ON TOP OF the Paddle keys being
-// present (lib/paddle PADDLE_CONFIGURED): the button is live only when both are
-// true, so setting the keys early (e.g. for the $1 smoke test) doesn't expose a
-// real Buy button before you mean to.
+// PAID_ENABLED is a deliberate "go live" switch ON TOP OF the Polar config
+// being present (lib/polarCheckout POLAR_CONFIGURED): the button is live only
+// when both are true, so wiring the keys early (e.g. for sandbox testing)
+// doesn't expose a real Buy button before you mean to. /api/checkout re-checks
+// the same flag server-side, so a direct POST can't mint a session either.
 //
 // ACCOUNTS_ENABLED gates the entire account area, not just sign-up — with it
 // off, /login and /account are closed too, so nobody can reach account features

@@ -12,7 +12,7 @@ Opens a URL. Use `$variables` anywhere in the URL — `https://example.com/$lang
 - **Timeout** — default 30000 ms.
 - **Wait until** — when the step counts as done: `load` (full page load), `domcontentloaded` (faster, before images), or `networkidle` (waits for network traffic to settle — good for single-page apps).
 - **Referer URL** — sent as the `Referer` header for this navigation.
-- **Anti-bot stealth** — hides the most obvious automation fingerprints (`navigator.webdriver`, missing plugins). Light protection only; for more, see [Stealth](/docs/instruments/human-like).
+- **Stealth** — normalizes the most obvious automated-session properties (`navigator.webdriver`, missing plugins). Light coverage only; for the full set, see [Stealth](/docs/instruments/session-environment#stealth).
 
 Only `http://` and `https://` URLs are allowed — anything else is blocked before it loads. If navigation times out, try a longer timeout or `domcontentloaded`.
 

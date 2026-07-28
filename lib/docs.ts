@@ -73,7 +73,7 @@ export const docsSections: DocsSection[] = [
       { slug: ['instruments', 'data'], label: 'Data' },
       { slug: ['instruments', 'checks'], label: 'Checks' },
       { slug: ['instruments', 'flow'], label: 'Flow' },
-      { slug: ['instruments', 'human-like'], label: 'Human-like' },
+      { slug: ['instruments', 'session-environment'], label: 'Session & environment' },
       { slug: ['instruments', 'advanced'], label: 'Advanced' },
     ],
   },
