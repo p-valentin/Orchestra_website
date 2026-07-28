@@ -443,3 +443,45 @@ Deno.test('52pl. non-POST → 405', async () => {
   await res.body?.cancel()
   assertEquals(res.status, 405)
 })
+
+Deno.test('53pl. order.refunded AND refund.created for the same refund → revoked once', async () => {
+  // Polar fires both for a single refund. The licence must end up refunded
+  // either way, and only ONE of the two may claim the transition — that is
+  // what stops the buyer getting two "your refund is confirmed" emails.
+  const user = await createTestUser(uniqueEmail('pl53'))
+  const order = nextId('ord')
+  try {
+    await deliver(orderPaid(order, user.email, { userId: user.id }))
+
+    assertEquals((await deliver(orderRefunded(order, user.email))).status, 200)
+    assertEquals((await deliver(refundEvent(order, 'succeeded'))).status, 200)
+    // …and in the other order, on a second licence, to prove neither event is
+    // privileged.
+    assertEquals((await deliver(refundEvent(order, 'succeeded', 'refund.updated'))).status, 200)
+
+    const { data: rows } = await admin.from('licenses').select('id, status').eq('order_id', order)
+    assertEquals(rows!.length, 1, 'still exactly one licence row')
+    assertEquals(rows![0].status, 'refunded')
+  } finally {
+    await cleanupPolar([order])
+    await deleteTestUser(user.id)
+  }
+})
+
+Deno.test('53pl-b. refund.created arriving BEFORE order.refunded also revokes once', async () => {
+  const user = await createTestUser(uniqueEmail('pl53b'))
+  const order = nextId('ord')
+  try {
+    await deliver(orderPaid(order, user.email, { userId: user.id }))
+    assertEquals((await deliver(refundEvent(order, 'succeeded'))).status, 200)
+    assertEquals((await deliver(orderRefunded(order, user.email))).status, 200)
+
+    const { data: rows } = await admin.from('licenses').select('id, status, user_id').eq('order_id', order)
+    assertEquals(rows!.length, 1)
+    assertEquals(rows![0].status, 'refunded')
+    assertEquals(rows![0].user_id, user.id, 'the refund must not detach the licence')
+  } finally {
+    await cleanupPolar([order])
+    await deleteTestUser(user.id)
+  }
+})

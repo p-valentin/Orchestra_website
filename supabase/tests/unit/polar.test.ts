@@ -198,3 +198,26 @@ Deno.test('parsePolarEvent: a non-string metadata.user_id never becomes an attac
     assertEquals(event.metadataUserId, null, `should reject metadata.user_id ${JSON.stringify(user_id)}`)
   }
 })
+
+Deno.test('parsePolarEvent: amounts come from the right field per event family', () => {
+  const paid = parsePolarEvent({
+    type: 'order.paid',
+    data: { id: 'ord_1', total_amount: 14900, currency: 'usd' },
+  })
+  assertEquals(paid.amountCents, 14900)
+  assertEquals(paid.currency, 'usd')
+
+  // A Refund reports `amount`, not `total_amount` — a partial refund must show
+  // what was actually returned, not the original order total.
+  const refund = parsePolarEvent({
+    type: 'refund.created',
+    data: { id: 'ref_1', order_id: 'ord_1', status: 'succeeded', amount: 5000, currency: 'usd' },
+  })
+  assertEquals(refund.amountCents, 5000)
+
+  // Junk must not reach Intl.NumberFormat as a number.
+  for (const bad of ['14900', null, {}, NaN, Infinity]) {
+    const e = parsePolarEvent({ type: 'order.paid', data: { id: 'x', total_amount: bad } })
+    assertEquals(e.amountCents, null, `should reject ${JSON.stringify(bad)}`)
+  }
+})

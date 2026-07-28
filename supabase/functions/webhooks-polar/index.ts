@@ -23,7 +23,7 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { errorResponse, json, serviceClient } from '../_shared/http.ts'
 import { parsePolarEvent, polarSignatureHeaders, verifyPolarSignature, type PolarEvent } from '../_shared/polar.ts'
-import { sendClaimEmail } from '../_shared/resend.ts'
+import { sendClaimEmail, sendRefundEmail } from '../_shared/resend.ts'
 import { markProcessed, pruneOldEvents, releaseEvent, storeEvent } from '../_shared/webhook-events.ts'
 
 const PROVIDER = 'polar'
@@ -114,7 +114,16 @@ async function handleOrderPaid(supabase: SupabaseClient, event: PolarEvent): Pro
     const { data: acct, error: acctErr } = await supabase.auth.admin.getUserById(attachedUserId)
     if (!acctErr && acct?.user?.email) confirmationEmail = acct.user.email
   }
-  if (confirmationEmail) await sendClaimEmail(confirmationEmail, event.invoiceNumber ?? event.orderId)
+  if (confirmationEmail) {
+    // `claimed` picks the copy: an attached licence needs no instructions, so
+    // telling that buyer to "create your account" would be both wrong and
+    // phishing-shaped. Only a genuinely unclaimed order gets the sign-up steps.
+    await sendClaimEmail(confirmationEmail, event.invoiceNumber ?? event.orderId, {
+      claimed: attachedUserId !== null,
+      amountCents: event.amountCents,
+      currency: event.currency,
+    })
+  }
 }
 
 // Any refund revokes, matching the Paddle path: Polar distinguishes a full
@@ -127,14 +136,41 @@ async function handleOrderPaid(supabase: SupabaseClient, event: PolarEvent): Pro
 //
 // Out-of-order delivery creates the row as refunded so a late order.paid can't
 // resurrect it.
-async function revokeLicense(supabase: SupabaseClient, orderId: string, buyerEmail: string | null): Promise<void> {
+// Returns the row it actually transitioned, or null when there was nothing to
+// transition (no such order, or already refunded). Callers use that to send the
+// refund email EXACTLY once: `order.refunded` and `refund.created` both fire for
+// the same refund, and the `.neq('status','refunded')` guard means only one of
+// them gets the row back — the other sees zero rows and stays quiet.
+interface RevokedLicense {
+  id: string
+  user_id: string | null
+  buyer_email: string
+}
+
+async function revokeLicense(
+  supabase: SupabaseClient,
+  orderId: string,
+  buyerEmail: string | null,
+): Promise<RevokedLicense | null> {
   const { data: updated, error: updateErr } = await supabase
     .from('licenses')
     .update({ status: 'refunded' })
     .eq('order_id', orderId)
-    .select('id')
+    .neq('status', 'refunded')
+    .select('id, user_id, buyer_email')
   if (updateErr) throw updateErr
-  if (updated && updated.length > 0) return
+  if (updated && updated.length > 0) return updated[0] as RevokedLicense
+
+  // Zero rows: either the licence is already refunded (a second delivery for
+  // the same refund) or no row exists yet. Distinguish, because only the
+  // second case should create one.
+  const { data: existing, error: readErr } = await supabase
+    .from('licenses')
+    .select('id')
+    .eq('order_id', orderId)
+    .maybeSingle()
+  if (readErr) throw readErr
+  if (existing) return null // already refunded — no second email
 
   const { error: insertErr } = await supabase.from('licenses').insert({
     order_id: orderId,
@@ -147,17 +183,42 @@ async function revokeLicense(supabase: SupabaseClient, orderId: string, buyerEma
     if (insertErr.code === '23505') {
       const { error } = await supabase.from('licenses').update({ status: 'refunded' }).eq('order_id', orderId)
       if (error) throw error
-      return
+      return null
     }
     throw insertErr
   }
+  // Refund-before-purchase: the row exists now, but nobody has bought anything
+  // from our point of view yet, so there is no one to notify.
+  return null
+}
+
+// Tells the buyer their licence is gone, at the account address when the
+// licence is attached (the same rule the purchase email follows). Best-effort:
+// a refund is already recorded in the database, and a failed email must never
+// fail the webhook.
+async function notifyRefund(
+  supabase: SupabaseClient,
+  revoked: RevokedLicense,
+  event: PolarEvent,
+): Promise<void> {
+  let to = revoked.buyer_email
+  if (revoked.user_id) {
+    const { data: acct, error } = await supabase.auth.admin.getUserById(revoked.user_id)
+    if (!error && acct?.user?.email) to = acct.user.email
+  }
+  if (!to) return // refund-first row with no email on it: nobody to tell
+  await sendRefundEmail(to, event.invoiceNumber ?? event.orderId, {
+    amountCents: event.amountCents,
+    currency: event.currency,
+  })
 }
 
 // order.refunded: data is the Order, so the buyer email is available for a
 // refund-before-purchase row.
 async function handleOrderRefunded(supabase: SupabaseClient, event: PolarEvent): Promise<void> {
   if (!event.orderId) return
-  await revokeLicense(supabase, event.orderId, event.customerEmail)
+  const revoked = await revokeLicense(supabase, event.orderId, event.customerEmail)
+  if (revoked) await notifyRefund(supabase, revoked, event)
 }
 
 // refund.created / refund.updated: data is the Refund, which points at
@@ -165,7 +226,8 @@ async function handleOrderRefunded(supabase: SupabaseClient, event: PolarEvent):
 // failed and canceled are stored and ignored.
 async function handleRefund(supabase: SupabaseClient, event: PolarEvent): Promise<void> {
   if (!event.orderId || event.refundStatus !== 'succeeded') return
-  await revokeLicense(supabase, event.orderId, null)
+  const revoked = await revokeLicense(supabase, event.orderId, null)
+  if (revoked) await notifyRefund(supabase, revoked, event)
 }
 
 Deno.serve(async (req) => {

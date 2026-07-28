@@ -14,10 +14,12 @@
 //     secret is expected to be base64 encoded", but their SDK's validateEvent
 //     does base64(utf8(secret)) and hands that to standardwebhooks, whose
 //     constructor base64-DECODES it. The two cancel: the HMAC key is the plain
-//     UTF-8 bytes of the secret exactly as shown in the Polar dashboard. Set
-//     POLAR_WEBHOOK_SECRET to that literal string — pre-encoding it yields
-//     silent 401s. (A `whsec_`-prefixed secret is also accepted, per the
-//     Standard Webhooks serialization, in case Polar ever hands one out.)
+//     UTF-8 bytes of the secret exactly as stored. Set POLAR_WEBHOOK_SECRET to
+//     that literal string — pre-encoding it yields silent 401s.
+//     Polar issues secrets in the Standard Webhooks `whsec_<base64>` form
+//     (confirmed against a real sandbox endpoint, 2026-07-27). Do NOT strip and
+//     decode that prefix the way a plain Standard Webhooks consumer would: the
+//     prefix is part of the signed key here. See secretKeyBytes below.
 //   - Payload: { type, timestamp, data: {...} } — note there is NO event id in
 //     the body. The `webhook-id` HEADER is the idempotency key; the spec
 //     guarantees it is stable across retries of the same event.
@@ -130,6 +132,10 @@ export interface PolarEvent {
   // support. The order id is machine-facing; this is the one on their receipt.
   invoiceNumber: string | null
   refundStatus: string | null // refund.* only: pending|succeeded|failed|canceled
+  // Minor units + ISO currency, for the confirmation/refund emails. order.*
+  // reports the order total; refund.* reports the refunded amount.
+  amountCents: number | null
+  currency: string | null
   // metadata.user_id, set server-side when opening checkout for a signed-in
   // buyer. Binds the purchase to that account regardless of the email typed
   // into Polar, so a changed email can't misdirect the license. This is the
@@ -147,7 +153,10 @@ export function parsePolarEvent(payload: any): PolarEvent {
 
   const isRefund = eventType.startsWith('refund.')
   const isOrder = eventType.startsWith('order.')
+  const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
   return {
+    amountCents: isRefund ? num(data.amount) : num(data.total_amount),
+    currency: str(data.currency),
     eventType,
     orderId: isRefund ? str(data.order_id) : isOrder ? str(data.id) : null,
     orderStatus: isOrder ? str(data.status) : null,
