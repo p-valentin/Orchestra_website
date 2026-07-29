@@ -166,14 +166,30 @@ export async function sendAsSupport(
 ): Promise<{ ok: boolean; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
+    // NOT the dev fallback the other senders use. Those log-and-return-true so
+    // an unrelated local flow (claiming a licence, submitting the contact form)
+    // is not blocked by mail config. Here the send IS the whole action, so
+    // reporting success for a message that never left would be a lie the admin
+    // acts on — they would think a customer had been answered.
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[email:dev] would send to ${to}\nSubject: ${subject}\n\n${body}`)
-      return { ok: true }
+      console.log(`[email:dev] NOT sent to ${to}\nSubject: ${subject}\n\n${body}`)
+      return {
+        ok: false,
+        error: 'Not sent: RESEND_API_KEY is unset here. The message was logged to the server console.',
+      }
     }
     return { ok: false, error: 'Email is not configured (RESEND_API_KEY unset).' }
   }
 
-  const from = process.env.RESEND_FROM ?? 'Orchestra <onboarding@resend.dev>'
+  // No fallback to Resend's onboarding@resend.dev sandbox address, which the
+  // other senders accept. The point of this feature is that the reply comes
+  // from our own domain instead of a personal Gmail; sending it from a shared
+  // Resend test address would be a worse version of the problem, and would
+  // look like a phish to whoever receives it.
+  const from = process.env.RESEND_FROM
+  if (!from) {
+    return { ok: false, error: 'Not sent: RESEND_FROM is unset, so there is no verified sender address.' }
+  }
   const replyTo = process.env.CONTACT_EMAIL ?? 'hello@orchestra-automation.com'
   const html = emailShell({
     heading: subject,
