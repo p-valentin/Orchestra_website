@@ -15,6 +15,8 @@ import { signLicense } from '@/lib/token'
 import CopyButton from '@/components/CopyButton'
 import { listAudit } from '@/lib/audit'
 import AdminCommerce from '@/components/AdminCommerce'
+import AdminEmailForm from '@/components/AdminEmailForm'
+import { sensitiveDataUnlocked } from '@/lib/totp'
 import { listPosts, type BlogPost } from '@/lib/blog'
 import {
   deleteClaimAction,
@@ -63,17 +65,35 @@ const td = 'border-t border-line py-1.5 pr-4 text-sm text-muted'
 const num = 'border-t border-line py-1.5 text-right font-mono text-sm text-fg'
 const btn = 'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors'
 const input = 'rounded-lg border border-line-strong bg-well px-3 py-2 font-mono text-sm text-fg outline-none focus:border-brass'
-const section = 'mt-12 scroll-mt-16'
+const section = 'mt-8'
 
-const NAV = [
-  ['#overview', 'Overview'],
-  ['#releases', 'Releases'],
-  ['#blog', 'Blog'],
-  ['#licenses', 'Licenses'],
-  ['#claims', 'Claims'],
-  ['#feedback', 'Feedback'],
-  ['#activity', 'Activity'],
+// Tabs, not anchors. Every section used to render on every load, so reaching
+// a refund meant scrolling past three analytics tables — and the anchor nav had
+// already drifted out of step with the page (it listed neither Purchases nor
+// Email). One section at a time keeps the nav honest by construction: a tab
+// that is not in this list cannot be reached.
+//
+// Driven by ?tab= rather than client state so the page stays a server
+// component, each view fetches only what it needs, and a particular tab can be
+// linked to or bookmarked.
+const TABS = [
+  ['overview', 'Overview'],
+  ['releases', 'Releases'],
+  ['blog', 'Blog'],
+  ['licenses', 'Licenses'],
+  ['purchases', 'Purchases'],
+  ['email', 'Email'],
+  ['feedback', 'Feedback'],
+  ['activity', 'Activity'],
 ] as const
+
+type TabId = (typeof TABS)[number][0]
+
+const DEFAULT_TAB: TabId = 'overview'
+
+function resolveTab(value: string | undefined): TabId {
+  return TABS.some(([id]) => id === value) ? (value as TabId) : DEFAULT_TAB
+}
 
 function formatDay(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -252,9 +272,10 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string; tab?: string }>
 }) {
-  const { error } = await searchParams
+  const { error, tab } = await searchParams
+  const active = resolveTab(tab)
   const [releases, live, stats, feedback, license, grants, claims, audit, posts] = await Promise.all([
     listReleases(),
     liveVersion(),
@@ -280,9 +301,13 @@ export default async function AdminPage({
   const prevConversion = prevMonth.totalViews > 0
     ? `${((prevMonth.totalDownloads / prevMonth.totalViews) * 100).toFixed(1)}% prior 30d`
     : 'no prior data'
-  const binaries = Object.fromEntries(
-    await Promise.all(releases.slice(0, 8).map(async r => [r.version, await binaryStatus(r.version)])),
-  ) as Record<string, Record<Platform, boolean>>
+  // Up to eight round-trips to R2 to see which platform binaries exist. Only
+  // the Releases tab shows them, so every other view used to pay for it.
+  const binaries = (active === 'releases'
+    ? Object.fromEntries(
+      await Promise.all(releases.slice(0, 8).map(async r => [r.version, await binaryStatus(r.version)])),
+    )
+    : {}) as Record<string, Record<Platform, boolean>>
 
   const claims7d = claims.filter(c => Date.now() - c.issuedAt < 7 * 86_400_000).length
   const claims30d = claims.filter(c => Date.now() - c.issuedAt < 30 * 86_400_000).length
@@ -324,11 +349,16 @@ export default async function AdminPage({
         aria-label="Sections"
         className="sticky top-0 z-10 -mx-4 mt-4 flex gap-1 overflow-x-auto border-b border-line bg-bg/90 px-4 py-2 backdrop-blur-md sm:-mx-8 sm:px-8"
       >
-        {NAV.map(([href, label]) => (
+        {TABS.map(([id, label]) => (
           <a
-            key={href}
-            href={href}
-            className="whitespace-nowrap rounded-md px-3 py-1 font-mono text-xs text-muted transition-colors hover:bg-well hover:text-fg"
+            key={id}
+            href={id === DEFAULT_TAB ? '/admin' : `/admin?tab=${id}`}
+            aria-current={active === id ? 'page' : undefined}
+            className={`whitespace-nowrap rounded-md px-3 py-1 font-mono text-xs transition-colors ${
+              active === id
+                ? 'bg-well text-fg'
+                : 'text-muted hover:bg-well hover:text-fg'
+            }`}
           >
             {label}
           </a>
@@ -348,7 +378,8 @@ export default async function AdminPage({
         </p>
       )}
 
-      <section id="overview" className="mt-8 scroll-mt-16">
+      {active === 'overview' && (
+      <section id="overview" className={section}>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <h2 className="font-display text-xl font-medium">Overview</h2>
           <span className="font-mono text-xs text-faint">cookieless · aggregate only · no visitor IDs</span>
@@ -375,7 +406,9 @@ export default async function AdminPage({
           <StatTable title="Top referrers" label="Site" rows={summary.topReferrers} />
         </div>
       </section>
+      )}
 
+      {active === 'releases' && (
       <section id="releases" className={section}>
         <h2 className="font-display text-xl font-medium">Releases</h2>
         <p className="mt-1 text-sm text-faint">
@@ -417,7 +450,9 @@ export default async function AdminPage({
           )}
         </div>
       </section>
+      )}
 
+      {active === 'blog' && (
       <section id="blog" className={section}>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <h2 className="font-display text-xl font-medium">Blog</h2>
@@ -451,7 +486,9 @@ export default async function AdminPage({
           )}
         </div>
       </section>
+      )}
 
+      {active === 'licenses' && (
       <section id="licenses" className={section}>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <h2 className="font-display text-xl font-medium">Licenses</h2>
@@ -510,9 +547,33 @@ export default async function AdminPage({
           )}
         </div>
       </section>
+      )}
 
-      <AdminCommerce />
+      {active === 'email' && (
+      <section id="email" className={section}>
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+          <h2 className="font-display text-xl font-medium">Send an email</h2>
+          <span className="font-mono text-xs text-faint">
+            from hello@orchestra-automation.com · replies go back to that address
+          </span>
+        </div>
+        <div className={`${card} mt-4`}>
+          {sensitiveDataUnlocked() ? (
+            <AdminEmailForm />
+          ) : (
+            <p className="text-sm text-muted">
+              Hidden until two-factor authentication is enabled. Set ADMIN_TOTP_SECRET and sign in
+              again — a form that sends mail under your own domain is not something to leave behind
+              a password alone.
+            </p>
+          )}
+        </div>
+      </section>
+      )}
 
+      {active === 'purchases' && <AdminCommerce />}
+
+      {active === 'licenses' && (
       <section id="claims" className={section}>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <h2 className="font-display text-xl font-medium">Free-window claims</h2>
@@ -571,7 +632,9 @@ export default async function AdminPage({
           )}
         </div>
       </section>
+      )}
 
+      {active === 'feedback' && (
       <section id="feedback" className={section}>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <h2 className="font-display text-xl font-medium">Feedback &amp; testimonials</h2>
@@ -581,7 +644,9 @@ export default async function AdminPage({
           <FeedbackPanel entries={feedback} />
         </div>
       </section>
+      )}
 
+      {active === 'activity' && (
       <section id="activity" className={section}>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <h2 className="font-display text-xl font-medium">Recent activity</h2>
@@ -606,6 +671,7 @@ export default async function AdminPage({
           )}
         </div>
       </section>
+      )}
     </main>
   )
 }

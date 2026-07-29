@@ -10,12 +10,3 @@ export interface ContactState {
 
 export const initialContactState: ContactState = { ok: false, message: '', errors: {} }
 
-export interface WaitlistState {
-  ok: boolean
-  message: string
-  errors: {
-    email?: string
-  }
-}
-
-export const initialWaitlistState: WaitlistState = { ok: false, message: '', errors: {} }
