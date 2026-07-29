@@ -1,4 +1,14 @@
-# Go-live checklist
+# Go-live checklist — COMPLETED 2026-07-29
+
+> **This checklist is done.** Orchestra 1.2.0 launched on 2026-07-29: both flags
+> are set, sign-up is open, checkout is live at $149, and all three platforms
+> download. The text below is kept as the record of what the switch involved —
+> it describes the PRE-LAUNCH state and is no longer a description of
+> production.
+>
+> For current state and outstanding work, see **`docs/NEXT-SESSION.md`**.
+
+---
 
 Everything below the line is done. What remains is one decision and one command.
 
