@@ -103,5 +103,61 @@ Deno.serve(async (req) => {
     return Response.json({ view: 'refunds', revealed: reveal, rows: data ?? [] })
   }
 
+  // The only write this endpoint accepts. The website has no service-role key
+  // — deliberately — so the compose box cannot insert its own audit row and has
+  // to ask for it here, under the same HMAC as every read.
+  //
+  // Narrow on purpose: it appends one row to a log and can express nothing
+  // else. Status is constrained to the two the table allows, and the strings
+  // are truncated, so a bug in the caller cannot turn this into unbounded
+  // storage. Nothing here can modify a licence, a refund or an account.
+  if (request.view === 'record-email') {
+    const rec = request.record
+    if (!rec || typeof rec !== 'object') return notFound()
+    const status = rec.status === 'failed' ? 'failed' : 'sent'
+    const str = (v: unknown, max: number): string | null =>
+      typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null
+    const toEmail = str(rec.to_email, 254)
+    const subject = str(rec.subject, 200)
+    if (!toEmail || !subject) return notFound()
+
+    const { error } = await supabase.from('sent_emails').insert({
+      to_email: toEmail,
+      subject,
+      status,
+      provider_id: str(rec.provider_id, 128),
+      error: str(rec.error, 500),
+      source: str(rec.source, 40) ?? 'admin-form',
+    })
+    if (error) {
+      console.error('[admin-data] email record failed:', error.message)
+      return notFound()
+    }
+    return Response.json({ view: 'record-email', ok: true })
+  }
+
+  if (request.view === 'emails') {
+    const { data, error } = await supabase
+      .from('sent_emails')
+      .select('id, to_email, subject, status, provider_id, error, source, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) {
+      console.error('[admin-data] emails read failed:', error.message)
+      return notFound()
+    }
+    // Masked by default like purchases. A log of who we have written to is a
+    // list of customer addresses; the page should stay safe to screenshot
+    // without thinking about it, and revealing stays a deliberate act.
+    return Response.json({
+      view: 'emails',
+      revealed: reveal,
+      rows: (data ?? []).map((r) => ({
+        ...r,
+        to_email: reveal ? r.to_email : maskEmail(r.to_email),
+      })),
+    })
+  }
+
   return notFound()
 })

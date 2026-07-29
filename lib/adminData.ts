@@ -44,6 +44,20 @@ export interface RefundRow {
   completed_at: string | null
 }
 
+// A sent message. No body: the log is read casually and should not become a
+// second copy of everything ever written to a customer. provider_id is Resend's
+// message id — the handle for asking them what happened to a specific one.
+export interface SentEmailRow {
+  id: string
+  to_email: string
+  subject: string
+  status: 'sent' | 'failed'
+  provider_id: string | null
+  error: string | null
+  source: string
+  created_at: string
+}
+
 export const REASON_LABELS: Record<string, string> = {
   not_what_expected: 'Not what they expected',
   missing_feature: 'Missing a feature',
@@ -113,6 +127,10 @@ export async function listPurchases(limit = 50, reveal = false): Promise<Purchas
 
 export async function listRefundRequests(limit = 50): Promise<RefundRow[] | null> {
   return await query<RefundRow>('refunds', limit, false)
+}
+
+export async function listSentEmails(limit = 50, reveal = false): Promise<SentEmailRow[] | null> {
+  return await query<SentEmailRow>('emails', limit, reveal)
 }
 
 // Used by the admin page to gate the reveal toggle behind a second factor of
