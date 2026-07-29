@@ -39,6 +39,53 @@ export async function sendEmail(subject: string, text: string, replyTo?: string)
 // orchestra:// deep link plus the raw key as a paste fallback. Returns true only
 // when Resend accepts it, so the website claim path can treat non-delivery as an
 // error (email is the only delivery channel for web claimers).
+// Shared shell for customer-facing mail from the website, matching the
+// purchase/refund emails the Edge Functions send (supabase/functions/_shared/
+// resend.ts). Table layout and inline styles because that is the only thing
+// that survives every mail client; the palette is the site's own, so mail
+// people receive looks like the product they just used.
+function esc(v: string): string {
+  return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function emailShell(opts: {
+  heading: string
+  body: string
+  cta?: { href: string; label: string }
+  footer?: string
+}): string {
+  const cta = opts.cta
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+            <tr><td style="border-radius:8px;background:#d9b36a;">
+              <a href="${opts.cta.href}" style="display:inline-block;padding:12px 24px;font-family:system-ui,sans-serif;font-size:15px;font-weight:600;color:#1a1306;text-decoration:none;">${esc(opts.cta.label)}</a>
+            </td></tr>
+          </table>`
+    : ''
+  const footer = opts.footer
+    ? `<tr><td style="padding:0 32px 28px;">
+            <p style="margin:0;font-size:12px;line-height:1.6;color:#6f6754;border-top:1px solid rgba(243,238,226,0.10);padding-top:16px;">${opts.footer}</p>
+          </td></tr>`
+    : ''
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="color-scheme" content="dark light">
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0b0a08;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b0a08;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#13110c;border:1px solid rgba(243,238,226,0.10);border-radius:12px;">
+        <tr><td style="padding:32px 32px 0;">
+          <p style="margin:0 0 24px;font-family:Georgia,serif;font-size:20px;color:#d9b36a;letter-spacing:0.02em;">Orchestra</p>
+          <h1 style="margin:0 0 20px;font-family:Georgia,serif;font-size:26px;font-weight:500;line-height:1.2;color:#f3eee2;">${esc(opts.heading)}</h1>
+          ${opts.body}
+          ${cta}
+        </td></tr>
+        ${footer}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+}
+
 export async function sendLicenseEmail(to: string, token: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
@@ -69,7 +116,28 @@ export async function sendLicenseEmail(to: string, token: string): Promise<boole
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject: 'Your Orchestra license', text }),
+      body: JSON.stringify({
+        from,
+        to,
+        subject: 'Your Orchestra license',
+        // Both parts: an HTML-only mail carrying a link and a long opaque key
+        // is a strong spam signal, and some clients render only the text one.
+        text,
+        html: emailShell({
+          heading: 'Your licence is ready',
+          body: `
+          <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#f3eee2;">
+            Open Orchestra with the button below and it activates automatically — nothing to copy.
+          </p>
+          <p style="margin:0 0 28px;font-size:16px;line-height:1.6;color:#a59c88;">
+            Thanks for being an early supporter.
+          </p>`,
+          cta: { href: activateUrl, label: 'Activate Orchestra' },
+          footer:
+            'Button not working? Paste this key into Orchestra → Settings → License:<br>' +
+            `<span style="color:#a59c88;word-break:break-all;font-family:ui-monospace,Menlo,monospace;">${esc(token)}</span>`,
+        }),
+      }),
     })
     if (!res.ok) console.error('[email] license send rejected:', res.status, await res.text().catch(() => ''))
     return res.ok

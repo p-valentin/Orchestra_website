@@ -6,6 +6,29 @@ project_id = "orchestra-license"
 [auth.email]
 enable_confirmations = true
 
+# Branded auth emails. These are the FIRST mail anyone gets from Orchestra —
+# before any purchase confirmation — so leaving them on Supabase's default
+# template made the account flow look unrelated to the product people had just
+# downloaded. Same shell as the purchase/refund emails in
+# functions/_shared/resend.ts: dark panel, brass accent, one clear action, and
+# the raw link underneath for clients that swallow the button.
+#
+# Push these to the linked project with:
+#   supabase config push --project-ref <ref>
+# Paths are relative to the PROJECT ROOT (the directory containing supabase/),
+# not to this file — "./templates/..." silently resolves to the wrong place.
+[auth.email.template.confirmation]
+subject = "Confirm your Orchestra account"
+content_path = "./supabase/templates/confirm-signup.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Orchestra password"
+content_path = "./supabase/templates/reset-password.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new Orchestra email"
+content_path = "./supabase/templates/change-email.html"
+
 # entitlement and claim-legacy require a valid Supabase Auth JWT; the gateway
 # rejects unauthenticated requests before they reach the function (verify_jwt
 # is the default — spelled out because the endpoints are useless without it).
