@@ -146,3 +146,57 @@ export async function sendLicenseEmail(to: string, token: string): Promise<boole
     return false
   }
 }
+
+// Sends a message from the support address to an arbitrary recipient — the
+// /admin compose form.
+//
+// Deliberately a lighter shell than the purchase/refund emails: those are
+// transactional and want branding, whereas this is a person replying to a
+// person. A heavily decorated template on "sorry about that, try X" reads as
+// automated, which is the opposite of what it is.
+//
+// The body is plain text from the compose box and is ESCAPED before being put
+// in the HTML part. It is typed by an admin, not a customer, but an admin who
+// pastes a customer's message into a reply would otherwise be injecting that
+// customer's markup into an email sent from our domain.
+export async function sendAsSupport(
+  to: string,
+  subject: string,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[email:dev] would send to ${to}\nSubject: ${subject}\n\n${body}`)
+      return { ok: true }
+    }
+    return { ok: false, error: 'Email is not configured (RESEND_API_KEY unset).' }
+  }
+
+  const from = process.env.RESEND_FROM ?? 'Orchestra <onboarding@resend.dev>'
+  const replyTo = process.env.CONTACT_EMAIL ?? 'hello@orchestra-automation.com'
+  const html = emailShell({
+    heading: subject,
+    body: `<p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#f3eee2;white-space:pre-wrap;">${esc(body)}</p>`,
+    footer: 'Orchestra — desktop browser automation. Reply to this email and it reaches a person.',
+  })
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, reply_to: replyTo, subject, text: body, html }),
+    })
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      console.error('[email] support send rejected:', res.status, detail)
+      // Resend's message is useful to an admin (bad address, domain not
+      // verified) in a way it never is to a customer, so surface it here.
+      return { ok: false, error: `Resend rejected it (${res.status}). ${detail.slice(0, 200)}` }
+    }
+    return { ok: true }
+  } catch (err) {
+    console.error('[email] support send failed:', (err as Error).message)
+    return { ok: false, error: 'Could not reach the mail service.' }
+  }
+}

@@ -15,6 +15,8 @@ import { signLicense } from '@/lib/token'
 import CopyButton from '@/components/CopyButton'
 import { listAudit } from '@/lib/audit'
 import AdminCommerce from '@/components/AdminCommerce'
+import AdminEmailForm from '@/components/AdminEmailForm'
+import { sensitiveDataUnlocked } from '@/lib/totp'
 import { listPosts, type BlogPost } from '@/lib/blog'
 import {
   deleteClaimAction,
@@ -507,6 +509,26 @@ export default async function AdminPage({
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      </section>
+
+      <section id="email" className={section}>
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+          <h2 className="font-display text-xl font-medium">Send an email</h2>
+          <span className="font-mono text-xs text-faint">
+            from hello@orchestra-automation.com · replies come back to you
+          </span>
+        </div>
+        <div className={`${card} mt-4`}>
+          {sensitiveDataUnlocked() ? (
+            <AdminEmailForm />
+          ) : (
+            <p className="text-sm text-muted">
+              Hidden until two-factor authentication is enabled. Set ADMIN_TOTP_SECRET and sign in
+              again — a form that sends mail under your own domain is not something to leave behind
+              a password alone.
+            </p>
           )}
         </div>
       </section>

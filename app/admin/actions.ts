@@ -11,6 +11,9 @@ import { setLegacyClaims, TOTAL_LICENSES } from '@/lib/licenses'
 import { deleteClaim } from '@/lib/claims'
 import { deletePost, parseTags, savePost, setPostPublished, slugify, SLUG_RE } from '@/lib/blog'
 import { recordAudit } from '@/lib/audit'
+import { sendAsSupport } from '@/lib/email'
+import { rateLimit } from '@/lib/rateLimit'
+import { sensitiveDataUnlocked } from '@/lib/totp'
 import { isValidEmail, sanitizeText } from '@/lib/sanitize'
 
 const VERSION_RE = /^\d+\.\d+\.\d+$/
@@ -175,4 +178,58 @@ export async function deletePostAction(formData: FormData): Promise<void> {
   await deletePost(slug)
   await recordAudit('post-deleted', slug)
   refreshBlog(slug)
+}
+
+
+export interface AdminEmailState {
+  ok: boolean
+  message: string
+}
+
+// Compose-and-send from the support address.
+//
+// This is the only admin control that reaches OUTSIDE the system — everything
+// else edits our own records, whereas a bad send lands in a stranger's inbox
+// with our domain on it and cannot be recalled. So it carries the same second
+// factor as the customer data (production requires TOTP), a rate limit, and an
+// audit entry recording who was written to and about what.
+//
+// The recipient is typed rather than picked from Purchases on purpose: pulling
+// customer addresses into the admin UI would undo the masking that currently
+// makes this page safe to screenshot.
+export async function sendAdminEmailAction(
+  _prev: AdminEmailState,
+  formData: FormData,
+): Promise<AdminEmailState> {
+  await requireAdmin()
+
+  if (!sensitiveDataUnlocked()) {
+    return { ok: false, message: 'Enable two-factor (ADMIN_TOTP_SECRET) before sending mail from production.' }
+  }
+
+  // Modest by design: this is for replying to people, not for campaigns. A
+  // burst would more likely be a stuck form than intent.
+  if (!rateLimit('admin-email', { max: 20, windowMs: 60 * 60 * 1000 }).allowed) {
+    return { ok: false, message: 'Too many sends in the last hour. Wait a bit.' }
+  }
+
+  const to = sanitizeText(formData.get('to'), 254)
+  const subject = sanitizeText(formData.get('subject'), 200)
+  const body = sanitizeText(formData.get('body'), 10_000)
+
+  if (!isValidEmail(to)) return { ok: false, message: 'That recipient address does not look right.' }
+  if (subject.length < 2) return { ok: false, message: 'Give it a subject.' }
+  if (body.length < 2) return { ok: false, message: 'The message is empty.' }
+
+  const result = await sendAsSupport(to, subject, body)
+  if (!result.ok) {
+    await recordAudit('email-failed', `${to} — ${subject}`)
+    return { ok: false, message: result.error ?? 'Sending failed.' }
+  }
+
+  // Subject only, never the body: the audit log is read casually and should
+  // not become a second copy of everything ever written to a customer.
+  await recordAudit('email-sent', `${to} — ${subject}`)
+  refresh()
+  return { ok: true, message: `Sent to ${to}.` }
 }
