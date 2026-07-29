@@ -1,12 +1,20 @@
 // Regression tests for the go-live review fixes:
 //   R1. a stuck idempotency slot (event stored, processed_at null) is
 //       reprocessed on redelivery instead of being swallowed with a 200
-//   R2. chargebacks revoke; chargeback_reverse reinstates; warnings no-op
 //   R3. an unclaimed refunded license matching the user's email does NOT
 //       block their trial (the bought-then-refunded griefing vector)
 //   R4. refresh mode never CREATES a trial
 //   R5. the device slot cap holds under concurrent activation (DB trigger)
 //   R6. concurrent same-fingerprint activations both succeed with one row
+//
+// R2 used to live here: "chargeback revokes, chargeback_reverse reinstates".
+// It was deleted with the Paddle handler rather than ported, because Polar has
+// no equivalent mechanism to test. Polar emits no dispute.* webhook — a dispute
+// arrives as `Refund.dispute` on the ordinary refund events, and the outcome is
+// carried by the refund's own status, so a dispute we win never revokes in the
+// first place and there is nothing to reinstate. Test 47pl in
+// polar-webhook.test.ts covers the gate that makes that true (only a
+// `succeeded` refund revokes; pending/failed/canceled leave the license alone).
 //
 // Same prereqs as the rest of tests/integration/ (running local stack).
 
@@ -17,62 +25,56 @@ import {
   createTestUser,
   deleteTestUser,
   loadTestKeys,
-  postPaddleWebhook,
+  postPolarWebhook,
   randomFingerprint,
   requireStack,
   seedLicense,
-  signPaddleWebhook,
+  signPolarWebhook,
   uniqueEmail,
 } from '../helpers.ts'
 
 requireStack()
 const admin = adminClient()
-const { paddleWebhookSecret } = await loadTestKeys()
+const { polarWebhookSecret } = await loadTestKeys()
 
-function txnCompleted(txnId: string, ctmId: string, eventId = `evt_${crypto.randomUUID()}`): string {
+function orderPaid(orderId: string, email: string): string {
   return JSON.stringify({
-    event_id: eventId,
-    event_type: 'transaction.completed',
-    occurred_at: new Date().toISOString(),
-    data: { id: txnId, status: 'completed', customer_id: ctmId, currency_code: 'USD' },
+    type: 'order.paid',
+    timestamp: new Date().toISOString(),
+    data: {
+      id: orderId,
+      status: 'paid',
+      paid: true,
+      billing_reason: 'purchase',
+      currency: 'usd',
+      total_amount: 14900,
+      product_id: 'prod_orchestra_lifetime',
+      customer_id: 'cus_review',
+      customer: { id: 'cus_review', email, email_verified: true },
+      metadata: {},
+    },
   })
 }
 
-function customerCreated(ctmId: string, email: string): string {
-  return JSON.stringify({
-    event_id: `evt_${crypto.randomUUID()}`,
-    event_type: 'customer.created',
-    occurred_at: new Date().toISOString(),
-    data: { id: ctmId, email, status: 'active' },
-  })
+// The idempotency key is the `webhook-id` HEADER, not anything in the body —
+// Standard Webhooks puts no event id in the payload. That is exactly why R1
+// pre-inserts the row keyed on the id it is about to deliver under.
+async function deliver(raw: string, id?: string) {
+  return await postPolarWebhook(raw, await signPolarWebhook(polarWebhookSecret, raw, { id }))
 }
 
-function adjustment(txnId: string, action: string, status: string): string {
-  return JSON.stringify({
-    event_id: `evt_${crypto.randomUUID()}`,
-    event_type: 'adjustment.updated',
-    occurred_at: new Date().toISOString(),
-    data: { id: `adj_${crypto.randomUUID()}`, action, status, transaction_id: txnId },
-  })
-}
-
-async function deliver(raw: string) {
-  return await postPaddleWebhook(raw, { signature: await signPaddleWebhook(paddleWebhookSecret, raw) })
-}
-
-async function licenseStatus(txnId: string): Promise<string | null> {
-  const { data } = await admin.from('licenses').select('status').eq('order_id', txnId).maybeSingle()
+async function licenseStatus(orderId: string): Promise<string | null> {
+  const { data } = await admin.from('licenses').select('status').eq('order_id', orderId).maybeSingle()
   return data?.status ?? null
 }
 
-async function cleanupPaddle(txnIds: string[], ctmIds: string[]) {
-  for (const txn of txnIds) {
-    await admin.from('licenses').delete().eq('order_id', txn)
-    await admin.from('webhook_events').delete().eq('payload->data->>id', txn)
-    await admin.from('webhook_events').delete().eq('payload->data->>transaction_id', txn)
+async function cleanupPolar(orderIds: string[], eventIds: string[] = []) {
+  for (const id of orderIds) {
+    await admin.from('licenses').delete().eq('order_id', id)
+    await admin.from('webhook_events').delete().eq('provider', 'polar').eq('payload->data->>id', id)
   }
-  for (const ctm of ctmIds) {
-    await admin.from('webhook_events').delete().eq('payload->data->>id', ctm)
+  for (const id of eventIds) {
+    await admin.from('webhook_events').delete().eq('provider', 'polar').eq('event_id', id)
   }
 }
 
@@ -81,56 +83,34 @@ function entitlementBody(fingerprint: string, extra: Record<string, unknown> = {
 }
 
 Deno.test('R1. stuck idempotency slot: redelivery processes the stored event instead of 200-and-drop', async () => {
-  const txn = `txn_${crypto.randomUUID()}`
-  const ctm = `ctm_${crypto.randomUUID()}`
-  const eventId = `evt_${crypto.randomUUID()}`
+  const order = `ord_${crypto.randomUUID()}`
+  const webhookId = `msg_${crypto.randomUUID()}`
   try {
-    assertEquals((await deliver(customerCreated(ctm, uniqueEmail('r1')))).status, 200)
-
-    // Simulate an isolate killed mid-processing: the event row exists,
-    // processed_at is null, and no license was created.
-    const raw = txnCompleted(txn, ctm, eventId)
+    // Simulate an isolate killed mid-processing: the event row exists with
+    // processed_at null, and no license was created. This is the failure the
+    // review found — the naive dedupe treated "row exists" as "already done"
+    // and returned 200, so the retry that would have fixed it was swallowed
+    // and the purchase silently never produced a license.
+    const raw = orderPaid(order, uniqueEmail('r1'))
     const { error } = await admin.from('webhook_events').insert({
-      provider: 'paddle',
-      event_id: eventId,
-      event_name: 'transaction.completed',
+      provider: 'polar',
+      event_id: webhookId,
+      event_name: 'order.paid',
       payload: JSON.parse(raw),
     })
     assertEquals(error, null)
-    assertEquals(await licenseStatus(txn), null)
+    assertEquals(await licenseStatus(order), null)
 
-    // Paddle's retry of the exact same event must create the license.
-    const retry = await deliver(raw)
-    assertEquals(retry.status, 200)
-    assertEquals(await licenseStatus(txn), 'active')
+    // Polar's retry of the same delivery must create the license.
+    assertEquals((await deliver(raw, webhookId)).status, 200)
+    assertEquals(await licenseStatus(order), 'active')
 
-    // And a further redelivery is a plain dedupe hit: still one license.
-    assertEquals((await deliver(raw)).status, 200)
-    const { data: rows } = await admin.from('licenses').select('id').eq('order_id', txn)
+    // And a further redelivery is a plain dedupe hit: still exactly one.
+    assertEquals((await deliver(raw, webhookId)).status, 200)
+    const { data: rows } = await admin.from('licenses').select('id').eq('order_id', order)
     assertEquals(rows?.length, 1)
   } finally {
-    await cleanupPaddle([txn], [ctm])
-  }
-})
-
-Deno.test('R2. chargeback revokes the license; reverse reinstates; warning is a no-op', async () => {
-  const txn = `txn_${crypto.randomUUID()}`
-  const ctm = `ctm_${crypto.randomUUID()}`
-  try {
-    assertEquals((await deliver(customerCreated(ctm, uniqueEmail('r2')))).status, 200)
-    assertEquals((await deliver(txnCompleted(txn, ctm))).status, 200)
-    assertEquals(await licenseStatus(txn), 'active')
-
-    assertEquals((await deliver(adjustment(txn, 'chargeback_warning', 'approved'))).status, 200)
-    assertEquals(await licenseStatus(txn), 'active')
-
-    assertEquals((await deliver(adjustment(txn, 'chargeback', 'approved'))).status, 200)
-    assertEquals(await licenseStatus(txn), 'refunded')
-
-    assertEquals((await deliver(adjustment(txn, 'chargeback_reverse', 'approved'))).status, 200)
-    assertEquals(await licenseStatus(txn), 'active')
-  } finally {
-    await cleanupPaddle([txn], [ctm])
+    await cleanupPolar([order], [webhookId])
   }
 })
 

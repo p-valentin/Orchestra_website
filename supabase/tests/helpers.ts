@@ -157,46 +157,6 @@ export async function signLegacyToken(
   return `${body}.${b64url(new Uint8Array(sig))}`
 }
 
-// Signs a request body the way Paddle does: `Paddle-Signature: ts=<unix>;
-// h1=<hex hmac-sha256 of "<ts>:<raw body>" with the endpoint secret>`.
-export async function signPaddleWebhook(
-  secret: string,
-  rawBody: string,
-  ts: number = Math.floor(Date.now() / 1000),
-): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${ts}:${rawBody}`))
-  const h1 = Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, '0')).join('')
-  return `ts=${ts};h1=${h1}`
-}
-
-// Posts a raw (pre-serialized) body to the Paddle webhook function — raw
-// because the signature covers exact bytes, so re-serialization would break it.
-export async function postPaddleWebhook(
-  rawBody: string,
-  opts: { signature: string },
-): Promise<FnResponse> {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/webhooks-paddle`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Paddle-Signature': opts.signature },
-    body: rawBody,
-  })
-  const text = await res.text()
-  let body: unknown = null
-  try {
-    body = text ? JSON.parse(text) : null
-  } catch {
-    body = { raw: text }
-  }
-  return { status: res.status, body }
-}
-
 // Signs a request the way Polar does (Standard Webhooks): headers
 // `webhook-id`, `webhook-timestamp` and `webhook-signature: v1,<base64 of
 // HMAC-SHA256 over "<id>.<ts>.<raw body>">`, keyed on the UTF-8 bytes of the
@@ -251,7 +211,6 @@ export async function postPolarWebhook(
 export interface TestKeys {
   legacyPrivateKeyPkcs8B64: string
   entitlementPublicJwk: JWK
-  paddleWebhookSecret: string
   polarWebhookSecret: string
   adminDataSecret: string
 }

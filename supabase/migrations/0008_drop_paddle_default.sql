@@ -1,0 +1,15 @@
+-- webhook_events.provider defaulted to 'paddle' (set in 0004_paddle.sql, back
+-- when Paddle was the only writer). Paddle is gone: the notification
+-- destination is disabled, the Edge Function is deleted, and its source is out
+-- of the repo.
+--
+-- The default never fires today — every caller of recordWebhookEvent passes
+-- provider explicitly — but it is a trap rather than dead weight. Idempotency
+-- lookups are provider-scoped (`.eq('provider', provider)`), so an insert that
+-- omitted the column would land labelled 'paddle', never match the dedupe
+-- query it belongs to, and silently reprocess or drop deliveries. Removing the
+-- default turns that mistake into a not-null violation at the point it is made.
+--
+-- Existing rows are untouched: this changes what happens to future inserts that
+-- omit the column, not any stored value.
+alter table public.webhook_events alter column provider drop default;

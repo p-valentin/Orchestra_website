@@ -109,8 +109,6 @@ interface RegisteredUser {
 const users = new Map<string, RegisteredUser>() // by email
 const seededLicenseIds = new Set<string>()
 const fingerprints = new Map<string, string>() // `${email}|${device_name}` → stable fingerprint
-const paddleTxnIds = new Set<string>() // transactions simulated via send_paddle_webhook
-const paddleEventIds = new Set<string>() // webhook_events rows those calls created
 const polarOrderIds = new Set<string>() // orders simulated via send_polar_webhook
 const polarEventIds = new Set<string>() // webhook_events rows those calls created
 
@@ -308,7 +306,7 @@ server.registerTool(
   'seed_license',
   {
     description:
-      'Insert a license row via the service role (what a Paddle purchase or pre-seeded legacy import would create). Leave claim_for_user_email unset to test email auto-claim.',
+      'Insert a license row via the service role (what a Polar purchase or pre-seeded legacy import would create). Leave claim_for_user_email unset to test email auto-claim.',
     inputSchema: {
       buyer_email: z.string().describe('Purchase email; auto-claim matches it against the account email'),
       status: z.enum(['active', 'refunded', 'revoked']).optional().describe('Default active'),
@@ -595,117 +593,6 @@ server.registerTool(
   }),
 )
 
-async function signPaddle(secret: string, body: string): Promise<string> {
-  const ts = Math.floor(Date.now() / 1000)
-  const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  )
-  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${ts}:${body}`))
-  const h1 = Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, '0')).join('')
-  return `ts=${ts};h1=${h1}`
-}
-
-server.registerTool(
-  'send_paddle_webhook',
-  {
-    description:
-      'Simulate a Paddle webhook delivery, signed with PADDLE_WEBHOOK_SECRET from supabase/functions/.env.test (ts/h1 HMAC like Paddle sends) and POSTed to /webhooks-paddle. event_type "purchase" is a convenience that sends customer.created (with the email) followed by transaction.completed — the normal Paddle sequence. Use corrupt_signature or raw_body for rejection paths.',
-    inputSchema: {
-      event_type: z.enum(['purchase', 'transaction.completed', 'customer.created', 'refund', 'refund_pending', 'other'])
-        .describe("'purchase' = customer.created + transaction.completed; 'refund' = approved adjustment; 'other' = an unrelated stored-only event"),
-      transaction_id: z.string().optional().describe('txn id — idempotency scope for purchases/refunds'),
-      customer_id: z.string().optional().describe('ctm id; default derived from transaction_id'),
-      email: z.string().optional().describe('Buyer email (goes into customer.created)'),
-      corrupt_signature: z.boolean().optional().describe('Send a wrong signature — must yield 401'),
-      raw_body: z.string().optional().describe('Send this exact body instead of a built payload (still correctly signed unless corrupt_signature)'),
-    },
-  },
-  tool(async ({ event_type, transaction_id, customer_id, email, corrupt_signature, raw_body }: {
-    event_type: 'purchase' | 'transaction.completed' | 'customer.created' | 'refund' | 'refund_pending' | 'other'
-    transaction_id?: string
-    customer_id?: string
-    email?: string
-    corrupt_signature?: boolean
-    raw_body?: string
-  }) => {
-    const cfg = await resolveConfig()
-    const envText = await Deno.readTextFile(new URL('../functions/.env.test', import.meta.url))
-    const secret = envText.match(/^PADDLE_WEBHOOK_SECRET=(.+)$/m)?.[1]?.trim()
-    if (!secret) throw new Error('PADDLE_WEBHOOK_SECRET missing from supabase/functions/.env.test — run setup_test_keys')
-
-    const txn = transaction_id ?? `txn_mcp_${crypto.randomUUID().slice(0, 8)}`
-    const ctm = customer_id ?? `ctm_for_${txn}`
-
-    const bodies: string[] = []
-    if (raw_body !== undefined) {
-      bodies.push(raw_body)
-    } else {
-      const evt = () => `evt_${crypto.randomUUID()}`
-      if (event_type === 'purchase' || event_type === 'customer.created') {
-        bodies.push(JSON.stringify({
-          event_id: evt(),
-          event_type: 'customer.created',
-          occurred_at: new Date().toISOString(),
-          data: { id: ctm, email: email ?? 'buyer@example.test', status: 'active' },
-        }))
-      }
-      if (event_type === 'purchase' || event_type === 'transaction.completed') {
-        bodies.push(JSON.stringify({
-          event_id: evt(),
-          event_type: 'transaction.completed',
-          occurred_at: new Date().toISOString(),
-          data: { id: txn, status: 'completed', customer_id: ctm, currency_code: 'USD' },
-        }))
-      }
-      if (event_type === 'refund' || event_type === 'refund_pending') {
-        bodies.push(JSON.stringify({
-          event_id: evt(),
-          event_type: 'adjustment.updated',
-          occurred_at: new Date().toISOString(),
-          data: {
-            id: `adj_${crypto.randomUUID().slice(0, 8)}`,
-            action: 'refund',
-            status: event_type === 'refund' ? 'approved' : 'pending_approval',
-            transaction_id: txn,
-          },
-        }))
-      }
-      if (event_type === 'other') {
-        bodies.push(JSON.stringify({
-          event_id: evt(),
-          event_type: 'subscription.activated',
-          data: { id: `sub_${crypto.randomUUID().slice(0, 8)}` },
-        }))
-      }
-    }
-
-    const results = []
-    for (const body of bodies) {
-      let signature = await signPaddle(secret, body)
-      if (corrupt_signature) signature = signature.replace(/h1=..../, 'h1=0000')
-      const res = await fetch(`${cfg.url}/functions/v1/webhooks-paddle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Paddle-Signature': signature },
-        body,
-      })
-      const text = await res.text()
-      if (res.status === 200) {
-        paddleTxnIds.add(txn)
-        try {
-          paddleEventIds.add(JSON.parse(body).event_id)
-        } catch { /* raw_body may not be JSON */ }
-      }
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(text)
-      } catch {
-        parsed = { raw: text }
-      }
-      results.push({ status: res.status, body: parsed })
-    }
-    return { transaction_id: txn, customer_id: ctm, deliveries: results }
-  }),
-)
 
 // Standard Webhooks signing, exactly as Polar does it: HMAC-SHA256 over
 // "<webhook-id>.<webhook-timestamp>.<body>", base64, keyed on the UTF-8 bytes
@@ -868,14 +755,14 @@ server.registerTool(
       const { data } = await adm.from('licenses').delete().in('id', [...seededLicenseIds]).select('id')
       licensesDeleted += data?.length ?? 0
     }
-    for (const orderIds of [paddleTxnIds, polarOrderIds]) {
+    for (const orderIds of [polarOrderIds]) {
       if (orderIds.size > 0) {
         const { data } = await adm.from('licenses').delete().in('order_id', [...orderIds]).select('id')
         licensesDeleted += data?.length ?? 0
       }
     }
     let eventsDeleted = 0
-    for (const eventIds of [paddleEventIds, polarEventIds]) {
+    for (const eventIds of [polarEventIds]) {
       if (eventIds.size > 0) {
         const { data } = await adm.from('webhook_events').delete().in('event_id', [...eventIds]).select('id')
         eventsDeleted += data?.length ?? 0
@@ -887,8 +774,6 @@ server.registerTool(
     users.clear()
     seededLicenseIds.clear()
     fingerprints.clear()
-    paddleTxnIds.clear()
-    paddleEventIds.clear()
     polarOrderIds.clear()
     polarEventIds.clear()
     return summary

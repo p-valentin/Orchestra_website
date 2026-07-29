@@ -126,13 +126,26 @@ async function handleOrderPaid(supabase: SupabaseClient, event: PolarEvent): Pro
   }
 }
 
-// Any refund revokes, matching the Paddle path: Polar distinguishes a full
-// `refunded` from a `partially_refunded` order, but a partial refund on a
-// single-item lifetime purchase is still a refund of that purchase.
-// Chargebacks need no separate branch — Polar surfaces a dispute as a Refund
-// carrying a `dispute` object, so it arrives down these same paths. There is
-// no dispute-resolution webhook, so reinstating a license after a won dispute
-// is a manual admin action.
+// Any refund revokes: Polar distinguishes a full `refunded` from a
+// `partially_refunded` order, but a partial refund on a single-item lifetime
+// purchase is still a refund of that purchase.
+//
+// Chargebacks need no separate branch. Polar has no dispute.* webhook (see the
+// event list in its OpenAPI spec); a dispute rides in on the ordinary refund
+// events as `Refund.dispute`, and THE DISPUTE OUTCOME IS CARRIED BY THE REFUND
+// STATUS — which is why handleRefund gating on `succeeded` is load-bearing
+// rather than merely defensive:
+//
+//   filed (needs_response) → refund pending   → no revoke, money hasn't moved
+//   lost                   → refund succeeded → revoke
+//   won                    → failed/canceled  → license correctly kept
+//   prevented              → refund succeeded → revoke (Polar pre-refunds small
+//                                               orders to dodge the dispute fee)
+//
+// refund.updated dispatches here too, so the resolution arrives on its own.
+// Hence no reinstate path: unlike Paddle — which revoked on any chargeback and
+// needed chargeback_reverse to undo it — a license is never revoked for a
+// dispute we go on to win.
 //
 // Out-of-order delivery creates the row as refunded so a late order.paid can't
 // resurrect it.
