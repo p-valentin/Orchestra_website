@@ -3,6 +3,32 @@ project_id = "orchestra-license"
 
 # Unverified throwaway signups must not get trials (Phase 1.5). Mirror this
 # in the hosted dashboard: Auth → Email → "Confirm email".
+# Where auth links land. The Site URL is the FALLBACK for any email that does
+# not carry an explicit redirect — password resets triggered outside the site,
+# a resend through the API, anything Supabase generates itself. It was pointing
+# at http://127.0.0.1:3000, so those links sent real customers to a localhost
+# address that only exists on a developer's machine.
+#
+# The signup form passes emailRedirectTo=/welcome explicitly, but that only
+# works if the URL is in the allow-list below — otherwise Supabase silently
+# falls back to site_url, which is exactly how this stayed invisible.
+#
+# Unlike [auth.email.template.*], these DO apply to the hosted project via
+# `supabase config push`.
+[auth]
+site_url = "https://www.orchestra-automation.com"
+additional_redirect_urls = [
+  "https://www.orchestra-automation.com/welcome",
+  "https://www.orchestra-automation.com/reset-password",
+  "https://orchestra-automation.com/welcome",
+  "https://orchestra-automation.com/reset-password",
+  # Local development, so the same flows can be exercised without editing this.
+  "http://localhost:3000/welcome",
+  "http://localhost:3000/reset-password",
+  "http://127.0.0.1:3000/welcome",
+  "http://127.0.0.1:3000/reset-password",
+]
+
 [auth.email]
 enable_confirmations = true
 
@@ -13,10 +39,13 @@ enable_confirmations = true
 # functions/_shared/resend.ts: dark panel, brass accent, one clear action, and
 # the raw link underneath for clients that swallow the button.
 #
-# Push these to the linked project with:
-#   supabase config push --project-ref <ref>
-# Paths are relative to the PROJECT ROOT (the directory containing supabase/),
-# not to this file — "./templates/..." silently resolves to the wrong place.
+# ⚠ THESE APPLY TO LOCAL DEVELOPMENT ONLY.
+# `supabase config push` reports auth as "updated" and silently ignores the
+# templates: on a HOSTED project they live in the dashboard (Authentication →
+# Emails) or must be set through the Management API. Editing the files below
+# changes nothing in production — keep them in step with whatever production
+# is actually serving, or they become a lie that reads like a source of truth.
+# Paths are relative to the PROJECT ROOT, not to this file.
 [auth.email.template.confirmation]
 subject = "Confirm your Orchestra account"
 content_path = "./supabase/templates/confirm-signup.html"
