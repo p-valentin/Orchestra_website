@@ -190,7 +190,17 @@ export async function sendAsSupport(
   if (!from) {
     return { ok: false, error: 'Not sent: RESEND_FROM is unset, so there is no verified sender address.' }
   }
-  const replyTo = process.env.CONTACT_EMAIL ?? 'hello@orchestra-automation.com'
+
+  // No explicit reply_to. It used to be CONTACT_EMAIL, which conflates two
+  // different things: CONTACT_EMAIL is where OUR notifications land (currently
+  // a personal Gmail), not an address customers should ever see. Setting it
+  // here put that private address in the reply-to of every support mail, where
+  // the recipient sees it the moment they hit reply — exactly the leak this
+  // feature exists to prevent.
+  //
+  // Omitting it makes replies go to the From address, which is the support
+  // address itself. That is the behaviour we want, and it stays correct
+  // without a second variable having to agree with the first.
   const html = emailShell({
     heading: subject,
     body: `<p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#f3eee2;white-space:pre-wrap;">${esc(body)}</p>`,
@@ -201,7 +211,7 @@ export async function sendAsSupport(
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, reply_to: replyTo, subject, text: body, html }),
+      body: JSON.stringify({ from, to, subject, text: body, html }),
     })
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
