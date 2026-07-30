@@ -158,10 +158,41 @@ export function adminDataConfigured(): boolean {
   return Boolean(secret && secret.length >= 32 && process.env.NEXT_PUBLIC_SUPABASE_URL)
 }
 
+// How long to wait on the Edge Function.
+//
+// Was 10 seconds, which is far too long for a page that renders this inside a
+// <Suspense> boundary and re-renders itself on a timer: a backend that stops
+// answering turned /admin into pulsing skeletons for ten seconds at a stretch,
+// then did it again on the next refresh, for ever. Four seconds is longer than
+// any healthy call here (measured: ~300-500ms) and short enough that failure
+// looks like failure instead of like a hang.
+const TIMEOUT_MS = 4_000
+
+// Circuit breaker.
+//
+// Every admin render fans out to this function, and the auto-refresh means a
+// broken backend gets hit again every minute per open tab — each call sitting
+// on the full timeout. That is how a slow dependency became a page that could
+// not be used at all, and it is also unkind to the thing that is already
+// struggling. After a few consecutive failures we stop calling for a cooldown
+// and fail instantly instead, so the page renders its "couldn't reach the
+// backend" state immediately rather than hanging first.
+//
+// Module scope, so it is per server instance and resets on deploy. Deliberately
+// not shared state: this is a courtesy throttle, not a correctness mechanism.
+const BREAKER_THRESHOLD = 3
+const BREAKER_COOLDOWN_MS = 30_000
+let consecutiveFailures = 0
+let breakerOpenUntil = 0
+
 // Signs and sends one request. Returns the parsed response, or null for
 // anything that did not work — the function 404s every failure by design, so
 // there is nothing more specific to hand back.
 async function call(payload: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  if (Date.now() < breakerOpenUntil) {
+    console.error(`[admin-data] ${payload.view} skipped — backend unreachable, retrying shortly`)
+    return null
+  }
   const secret = process.env.ADMIN_DATA_SECRET
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!secret || !base) return null
@@ -189,17 +220,26 @@ async function call(payload: Record<string, unknown>): Promise<Record<string, un
         'x-orchestra-sig': `v1,${sig}`,
       },
       body,
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: 'no-store',
     })
     if (!res.ok) {
       // 404s everything, so status alone cannot tell us whether the signature
-      // was wrong or the view was — log and move on.
+      // was wrong or the view was — log and move on. A rejection is a real
+      // answer from a healthy backend, so it does not trip the breaker.
+      consecutiveFailures = 0
       console.error(`[admin-data] ${payload.view} request rejected (${res.status})`)
       return null
     }
+    consecutiveFailures = 0
     return (await res.json()) as Record<string, unknown>
   } catch (err) {
+    consecutiveFailures += 1
+    if (consecutiveFailures >= BREAKER_THRESHOLD) {
+      breakerOpenUntil = Date.now() + BREAKER_COOLDOWN_MS
+      consecutiveFailures = 0
+      console.error(`[admin-data] backend unreachable — pausing calls for ${BREAKER_COOLDOWN_MS / 1000}s`)
+    }
     console.error(`[admin-data] ${payload.view} request failed:`, err instanceof Error ? err.message : err)
     return null
   }

@@ -63,8 +63,13 @@ const ERROR_MESSAGES: Record<string, string> = {
 // The badge is its own async component so the nav paints without waiting on a
 // Supabase round-trip. It used to be awaited inline before any tab rendered,
 // on every page load, whichever tab was open.
-async function UnreadBadge() {
+async function UnreadBadge({ active }: { active: TabId }) {
   if (!sensitiveDataUnlocked() || !adminDataConfigured()) return null
+  // Skip it entirely on the tab it points at: the inbox below is already
+  // fetching the threads, and those carry per-thread unread counts. Asking the
+  // Edge Function the same question twice per render was pure duplication —
+  // and when the backend is slow it was two hangs instead of one.
+  if (active === 'email') return null
   const unread = await unreadMailCount()
   if (unread <= 0) return null
   return (
@@ -193,7 +198,7 @@ export default async function AdminPage({
             {label}
             {id === 'email' && (
               <Suspense fallback={null}>
-                <UnreadBadge />
+                <UnreadBadge active={active} />
               </Suspense>
             )}
           </Link>
