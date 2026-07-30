@@ -16,7 +16,7 @@ Checked against production, not inferred:
 | Price | `$149`, confirmed on Polar's own checkout: $149 subtotal / $149 total, one-time |
 | Downloads | Linux / macOS / Windows all resolve to real files |
 | Auto-update | `latest.yml`, `latest-linux.yml`, `latest-mac.yml` all at 1.2.0 |
-| Website | `main` @ `7c8e604` |
+| Website | `main` @ `72ccde5`, deployment READY and aliased to www — the three commits before it all failed to build, see below |
 | App | `main` @ `d3f7e6f`, tag `v1.2.0` |
 
 The 17 beta lifetime licences were emailed at 16:16 UTC — 17/17 accepted,
@@ -40,7 +40,7 @@ Verified against production, not inferred:
 |---|---|
 | migration `0010_mail_inbox` | applied — `mail_threads`, `mail_messages`, RLS on, no policies, no anon/authenticated grants |
 | `admin-data` | **v9 deployed** — `threads`, `thread`, `thread-read`, `mail-unread` added; `purchases`/`refunds` unchanged and still returning masked rows |
-| `mail-ingest` | **v1 deployed**, `verify_jwt = false`, 404s everything (its secret is not set — see below) |
+| `mail-ingest` | **v2 deployed**, `verify_jwt = false`, 404s everything (its secret is not set — see below) |
 | `/admin?tab=email` | inbox + thread view + reply box + compose box, behind TOTP |
 | Backend tests | **173 pass** (was 130) |
 | Worker tests | 5 pass, no Cloudflare account needed |
@@ -93,7 +93,28 @@ does today, and the inbox tab simply stays empty.
   within the same participant, so nobody can drop their text into another
   customer's thread. There is a test for it (`mail-ingest.test.ts` case 101).
 
-### Two things found on the way
+### Three things found on the way
+
+- **Production had not built for three commits.** `7c8e604`, `4c2492c` and
+  `4202e7b` all pushed to `main`, all created a deployment, and all **ERRORed**
+  in the build — so the live site was still serving `a42602c` from launch day,
+  and nothing said so. The cause was a type error introduced by `7c8e604`
+  itself: `listSentEmails()` called `query('emails', …)` while `query` was typed
+  `'purchases' | 'refunds'`. `npm run build` type-checks; nothing else did.
+  Fixed here as a side effect of widening that function, and the build that
+  carried this work is the **first green production build since launch day**.
+
+  This is the same trap as the Windows release leg, in a second place: *a
+  created deployment is not a built one*. After pushing to `main`, check the
+  state, not just that the push landed —
+
+  ```sh
+  # or the dashboard; the MCP server's list_deployments shows state per commit
+  curl -s -o /dev/null -w '%{http_code}\n' https://www.orchestra-automation.com/
+  ```
+
+  …and confirm the deployment whose `githubCommitSha` is yours reads `READY`,
+  not `ERROR`. A stale-but-working site looks exactly like a fresh one.
 
 - **`0009` never granted `sent_emails` to `service_role`.** Production has the
   grant by accident of when the table was created; a database built from the
