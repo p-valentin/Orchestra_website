@@ -1,3 +1,9 @@
+// Where Resend lives. Overridable so the send path can be exercised against a
+// local mock — mirrors supabase/functions/_shared/resend.ts, which has had this
+// since the claim emails were written. Unset in production, which is the only
+// place it matters; a bad value here sends nowhere rather than somewhere wrong.
+const RESEND_URL = `${process.env.RESEND_BASE_URL ?? 'https://api.resend.com'}/emails`
+
 // Resend notification. Returns true only when Resend accepts the message, so
 // callers can gate side effects (e.g. decrementing the license counter) on the
 // email actually going out. Returns false when unconfigured or on any failure.
@@ -16,7 +22,7 @@ export async function sendEmail(subject: string, text: string, replyTo?: string)
     return false
   }
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch(RESEND_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -113,7 +119,7 @@ export async function sendLicenseEmail(to: string, token: string): Promise<boole
     'Thanks for being an early supporter.',
   ].join('\n')
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch(RESEND_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -208,7 +214,7 @@ export async function sendAsSupport(
   })
 
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch(RESEND_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, to, subject, text: body, html }),

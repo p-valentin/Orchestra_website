@@ -15,7 +15,7 @@ import { sendAsSupport } from '@/lib/email'
 import { getMailThread, markThreadRead, recordSentEmail } from '@/lib/adminData'
 import { rateLimit } from '@/lib/rateLimit'
 import { sensitiveDataUnlocked } from '@/lib/totp'
-import { isValidEmail, sanitizeText } from '@/lib/sanitize'
+import { isValidEmail, sanitizeMessageBody, sanitizeText } from '@/lib/sanitize'
 
 const VERSION_RE = /^\d+\.\d+\.\d+$/
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -217,7 +217,7 @@ export async function sendAdminEmailAction(
 
   const to = sanitizeText(formData.get('to'), 254)
   const subject = sanitizeText(formData.get('subject'), 200)
-  const body = sanitizeText(formData.get('body'), 10_000)
+  const body = sanitizeMessageBody(formData.get('body'), 10_000)
 
   if (!isValidEmail(to)) return { ok: false, message: 'That recipient address does not look right.' }
   if (subject.length < 2) return { ok: false, message: 'Give it a subject.' }
@@ -316,7 +316,7 @@ export async function replyToThreadAction(
   const threadId = String(formData.get('thread') ?? '')
   if (!UUID_RE.test(threadId)) return { ok: false, message: 'That conversation no longer exists.' }
 
-  const body = sanitizeText(formData.get('body'), 10_000)
+  const body = sanitizeMessageBody(formData.get('body'), 10_000)
   if (body.length < 2) return { ok: false, message: 'The message is empty.' }
 
   const thread = await getMailThread(threadId, true)
