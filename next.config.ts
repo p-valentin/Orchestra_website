@@ -24,9 +24,21 @@ const supabaseOrigin = (() => {
 // This replaces the six directives that previously allowed https://*.paddle.com.
 const POLAR = 'https://polar.sh https://sandbox.polar.sh'
 
+// React's development build uses eval() — for HMR, for reconstructing
+// callstacks across the server/client boundary, and for the RSC dev runtime.
+// Without 'unsafe-eval' the dev client throws "eval() is not supported in this
+// environment" and stops applying streamed RSC payloads: the server sends the
+// whole page, the browser paints the shell, and everything behind a <Suspense>
+// boundary silently never arrives. It looks exactly like a page that is stuck
+// loading, and it does not reproduce with curl, which runs no JavaScript.
+//
+// PRODUCTION IS UNCHANGED. This is gated on NODE_ENV so the deployed policy
+// keeps refusing eval; the production React build has no such requirement.
+const devEval = process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"
+
 const ContentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${devEval}`,
   "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
   "font-src 'self' fonts.gstatic.com",
   // downloads host allowed so blog posts can embed images/GIFs hosted on the
