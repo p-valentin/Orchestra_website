@@ -61,6 +61,9 @@ export default function AdminEmailForm() {
     <form
       action={formAction}
       onSubmit={() => setArmed(false)}
+      // The page auto-refreshes every 15s and must not do it while there is
+      // unsent text in here — see AdminAutoRefresh.
+      data-guard-refresh
       className="flex flex-col gap-3"
     >
       <div className="flex flex-wrap gap-2">

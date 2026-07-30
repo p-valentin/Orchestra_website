@@ -17,6 +17,7 @@ import { listAudit } from '@/lib/audit'
 import AdminCommerce from '@/components/AdminCommerce'
 import AdminEmailForm from '@/components/AdminEmailForm'
 import AdminInbox from '@/components/AdminInbox'
+import AdminAutoRefresh from '@/components/AdminAutoRefresh'
 import { adminDataConfigured, unreadMailCount } from '@/lib/adminData'
 import { sensitiveDataUnlocked } from '@/lib/totp'
 import { listPosts, type BlogPost } from '@/lib/blog'
@@ -344,6 +345,7 @@ export default async function AdminPage({
         <h1 className="font-display text-2xl font-medium tracking-tight sm:text-3xl">Orchestra admin</h1>
         <span className="font-mono text-xs text-faint">live v{live}</span>
         <span className="font-mono text-xs text-faint">storage: {storageMode()}</span>
+        <AdminAutoRefresh />
         <div className="ml-auto flex items-center gap-4">
           <a href="/releases" className="font-mono text-xs text-muted hover:text-fg">/releases →</a>
           <form action={logoutAction}>

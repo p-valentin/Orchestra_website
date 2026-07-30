@@ -9,9 +9,11 @@ The forward is the point. `/admin` is a convenience on top of the mailbox, never
 a replacement for it — if ingest breaks, mail still arrives exactly where it
 always has.
 
-**This was written but not deployed.** Cloudflare credentials were not available
-in the session that built it. Everything below is the exact sequence; nothing in
-it has been run against the live route.
+**The Supabase half is done and verified; the Cloudflare half is not.** The
+ingest function is deployed, its secret is set, and it has been smoke-tested
+against production. What remains is deploying this Worker and binding the route
+— Cloudflare credentials were not available in the session that built it.
+Steps 3–5 below have not been run against the live route.
 
 ---
 
@@ -24,7 +26,7 @@ You need:
 - the destination address currently receiving `hello@` — it must stay a
   **verified destination** in Email Routing, or `message.forward()` fails
 
-Check what the route does today first, because step 5 replaces it:
+Check what the route does today first, because step 4 replaces it:
 
 > Cloudflare dashboard → `orchestra-automation.com` → **Email** → **Email
 > Routing** → **Routing rules**. Note the destination on the `hello@` rule.
@@ -39,31 +41,39 @@ npm install
 npx wrangler login          # device flow, needs a browser
 ```
 
-## 2. Mint the shared secret
+## 2. The shared secret — already minted, already on Supabase
 
-One secret, used in two places. 32 bytes of hex — the Supabase function refuses
-anything under 32 characters:
+**Done on 2026-07-30.** `MAIL_INGEST_SECRET` was generated, set on the Supabase
+project, and the live endpoint was smoke-tested with it (signed POST accepted, a
+duplicate deduplicated, a wrong key 404'd, the test row deleted afterwards).
+`mail-ingest` is deployed and reads it per request.
+
+The value is on this machine at **`/home/vali/.orchestra-mail-ingest-secret`**
+(mode 600). It was deliberately never printed to a terminal or a chat
+transcript — that is how the Resend key ended up needing rotation.
+
+It is **not** the website's `ADMIN_DATA_SECRET` and must never be set to the
+same value: Cloudflare and Vercel are separate trust domains, and the point of
+two keys is that a compromise of one does not become a read of the purchase
+table. There is a test asserting neither key opens the other.
+
+If you ever need to rotate it, do both sides together:
 
 ```sh
-openssl rand -hex 32
+openssl rand -hex 32 > ~/.orchestra-mail-ingest-secret
+supabase secrets set MAIL_INGEST_SECRET="$(cat ~/.orchestra-mail-ingest-secret)" \
+  --project-ref jxcxtwmqwontjttywxlt
+npx wrangler secret put MAIL_INGEST_SECRET < ~/.orchestra-mail-ingest-secret
 ```
 
-Keep it on the clipboard for the next two steps. It is **not** the website's
-`ADMIN_DATA_SECRET` and must not be set to the same value: Cloudflare and Vercel
-are separate trust domains, and the point of two keys is that a compromise of
-one does not become a read of the purchase table.
+Between the two commands, inbound mail forwards normally but does not reach
+`/admin`. Nothing is lost.
 
-## 3. Give it to Supabase
+## 3. Give the same secret to the Worker, and deploy
 
 ```sh
-supabase secrets set MAIL_INGEST_SECRET=<the hex> --project-ref jxcxtwmqwontjttywxlt
-supabase functions deploy mail-ingest --project-ref jxcxtwmqwontjttywxlt
-```
-
-## 4. Give it to the Worker, and deploy
-
-```sh
-npx wrangler secret put MAIL_INGEST_SECRET     # paste the same hex
+# reads the file rather than echoing the secret into your shell history
+npx wrangler secret put MAIL_INGEST_SECRET < ~/.orchestra-mail-ingest-secret
 npx wrangler secret put FORWARD_TO             # the address from "Before you start"
 npx wrangler deploy
 ```
@@ -75,16 +85,16 @@ file that lives in version control.
 `INGEST_URL` **is** in `wrangler.toml` — it is a public URL that 404s everything
 unsigned, so it is better reviewable than hidden.
 
-## 5. Bind the route
+## 4. Bind the route
 
 > Cloudflare dashboard → `orchestra-automation.com` → **Email** → **Email
 > Routing** → **Routing rules** → edit the `hello@` rule
 > → Action: **Send to a Worker** → `orchestra-email` → Save.
 
 This is the moment mail starts flowing through the Worker. The Worker must
-already be deployed (step 4) or it will not appear in the dropdown.
+already be deployed (step 3) or it will not appear in the dropdown.
 
-## 6. Verify — before walking away
+## 5. Verify — before walking away
 
 ```sh
 npx wrangler tail

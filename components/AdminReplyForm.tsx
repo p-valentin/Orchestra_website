@@ -74,7 +74,14 @@ export default function AdminReplyForm({
   const [armed, setArmed] = useState(false)
 
   return (
-    <form action={formAction} onSubmit={() => setArmed(false)} className="mt-4 flex flex-col gap-3">
+    <form
+      action={formAction}
+      onSubmit={() => setArmed(false)}
+      // The page auto-refreshes every 15s and must not do it while there is
+      // unsent text in here — see AdminAutoRefresh.
+      data-guard-refresh
+      className="mt-4 flex flex-col gap-3"
+    >
       <input type="hidden" name="thread" value={threadId} />
 
       <p className="font-mono text-xs text-faint">

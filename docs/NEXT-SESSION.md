@@ -48,18 +48,25 @@ Verified against production, not inferred:
 ### What still needs your hands
 
 Everything left is Cloudflare, and it is all in **`email-worker/README.md`** —
-that file is the deploy runbook, written to be followed top to bottom. In short:
+that file is the deploy runbook, written to be followed top to bottom.
 
-- [ ] `openssl rand -hex 32` — one secret, set in **both** places:
-      `supabase secrets set MAIL_INGEST_SECRET=… --project-ref jxcxtwmqwontjttywxlt`
-      and `wrangler secret put MAIL_INGEST_SECRET`.
-      **Not** the same value as `ADMIN_DATA_SECRET` — separate trust domains is
-      the whole point of it being a second key.
-- [ ] `wrangler secret put FORWARD_TO` — the mailbox `hello@` forwards to today.
-      A secret rather than a `[vars]` entry because it is a personal address and
-      does not belong in a file under version control.
-- [ ] `wrangler deploy`, then bind the route: Cloudflare → Email → Email Routing
-      → the `hello@` rule → **Send to a Worker** → `orchestra-email`.
+`MAIL_INGEST_SECRET` is **already minted and already set on Supabase**, and the
+live endpoint was smoke-tested with it end to end: a signed POST stored a
+message, a repeat of it deduplicated, a wrong key 404'd, the sanitiser stripped
+the script/pixel/`javascript:` payload, and the test row was deleted afterwards.
+The value sits at `~/.orchestra-mail-ingest-secret` (mode 600) and was never
+printed to a terminal or a transcript.
+
+So what is left is:
+
+- [ ] `cd email-worker && npm install && npx wrangler login`
+- [ ] note the address the `hello@` rule forwards to **before** changing it
+- [ ] `npx wrangler secret put MAIL_INGEST_SECRET < ~/.orchestra-mail-ingest-secret`
+- [ ] `npx wrangler secret put FORWARD_TO` — that address. A secret rather than a
+      `[vars]` entry because it is a personal mailbox and does not belong in a
+      file under version control.
+- [ ] `npx wrangler deploy`, then bind the route: Cloudflare → Email → Email
+      Routing → the `hello@` rule → **Send to a Worker** → `orchestra-email`.
 - [ ] verify with `wrangler tail` **and** an actual test message, checking all
       three: no error in the tail, the mail still lands in the forwarded
       mailbox, and it appears in `/admin?tab=email`.
@@ -92,6 +99,14 @@ does today, and the inbox tab simply stays empty.
 - **`In-Reply-To` is attacker-controlled.** The reference chain is only followed
   within the same participant, so nobody can drop their text into another
   customer's thread. There is a test for it (`mail-ingest.test.ts` case 101).
+- **The page auto-refreshes every 15s** (`components/AdminAutoRefresh.tsx`) via
+  `router.refresh()`, not a reload — so scroll position, open `<details>` and
+  client state survive. It **pauses** while the tab is in the background, and
+  while there is unsent text in the compose or reply box: a hard refresh over a
+  half-written reply to a customer is a worse failure than a thread list being
+  fifteen seconds stale. Those two forms carry `data-guard-refresh`; the check
+  is scoped to them because the release/blog/licence forms are pre-filled from
+  server data and would otherwise look permanently "in progress".
 
 ### Three things found on the way
 
@@ -122,10 +137,25 @@ does today, and the inbox tab simply stays empty.
   *permission denied*. `0010` states the grant explicitly. This is exactly the
   fragility `0007` was written to remove — if you add a table to `public`, end
   the migration with the revoke/grant pair.
-- **`vercel deploy --prod` is still broken here** (below), and the Supabase CLI
-  in this environment has no access token, so both Edge Functions were deployed
-  through the Supabase MCP server instead. `supabase functions deploy` needs
-  `supabase login` (a browser device flow) first.
+- **`supabase db push` would try to re-apply 0006–0010.** `supabase migration
+  list --linked` shows local `0006`…`0010` against remote versions
+  `20260728125107`…`20260730064516`: same migrations, different version strings,
+  so the CLI does not match them up. Only `0001`–`0005` line up by name.
+
+  Nothing is wrong with the *schema* — every migration is applied and
+  production is correct. It is the bookkeeping that has drifted, and the
+  consequence is that a future `db push` tries to run `create table` on tables
+  that already exist. It would fail loudly rather than corrupt anything, but it
+  is a nasty surprise mid-deploy. `supabase migration repair --status applied
+  0006 0007 0008 0009 0010` fixes the history if you want `db push` to be safe;
+  left alone deliberately, since it touches production bookkeeping and nothing
+  needs it today.
+
+- **`vercel deploy --prod` is still broken here** (below). The Supabase CLI now
+  works (`supabase login` was done on 2026-07-30) — before that it had no access
+  token and both Edge Functions were deployed through the Supabase MCP server.
+  Both were redeployed from disk with the CLI afterwards, so what is running is
+  byte-for-byte the repo.
 
 ### Owner-only chores
 
