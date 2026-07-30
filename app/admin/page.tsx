@@ -176,6 +176,15 @@ export default async function AdminPage({
           <Link
             key={id}
             href={id === DEFAULT_TAB ? '/admin' : `/admin?tab=${id}`}
+            // Never prefetch. Every one of these targets is force-dynamic, so a
+            // prefetch is not a cheap cache warm — it is a FULL render of that
+            // tab, including its Supabase round-trips. Seven links sit in a
+            // sticky nav that is always in the viewport, so the default
+            // behaviour fires seven complete page renders the moment /admin
+            // loads, and again after every router.refresh(). That is what made
+            // the page appear to hang: a storm of 200s and a busy main thread,
+            // for tabs nobody had clicked.
+            prefetch={false}
             aria-current={active === id ? 'page' : undefined}
             className={`whitespace-nowrap rounded-md px-3 py-1 font-mono text-xs transition-colors ${
               active === id ? 'bg-well text-fg' : 'text-muted hover:bg-well hover:text-fg'

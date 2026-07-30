@@ -170,6 +170,11 @@ export default async function AdminInbox({ openThreadId }: { openThreadId?: stri
               <Link
                 key={t.id}
                 href={`/admin?tab=email&thread=${t.id}`}
+                // Same reason as the tab nav: /admin is force-dynamic, so
+                // prefetching this list would fire one complete page render per
+                // conversation — up to fifty of them, each with its own Edge
+                // Function calls — for threads nobody has opened.
+                prefetch={false}
                 className={`flex flex-col gap-1 border-t border-line px-2 py-2.5 transition-colors first:border-t-0 ${
                   active ? 'bg-well' : 'hover:bg-well/60'
                 }`}
