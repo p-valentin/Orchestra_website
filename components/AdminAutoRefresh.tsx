@@ -22,7 +22,11 @@ import { useRouter } from 'next/navigation'
 //     someone's half-written apology to a customer, and the cost of waiting is
 //     that a thread list is fifteen seconds stale.
 
-const INTERVAL_MS = 15_000
+// A minute, not fifteen seconds. At 15s this re-ran the entire server tree four
+// times a minute — which, back when every tab paid for a nine-call R2 fan-out,
+// meant the admin page was the busiest thing on the site by a wide margin. It
+// is also now mounted only on the tabs where new data actually arrives.
+const INTERVAL_MS = 60_000
 
 // Only the forms that are marked. Checking every input on the page would be
 // wrong: the release, blog and licence forms are pre-filled from server data,

@@ -3,12 +3,14 @@ import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import { publishedPosts } from '@/lib/blog'
 
-export const dynamic = 'force-dynamic'
+// Publishing already calls revalidatePath('/blog'), so an hourly floor costs
+// nothing in freshness and buys CDN caching on a page crawlers hit often.
+export const revalidate = 3600
 
 export const metadata: Metadata = {
-  title: 'Blog — Orchestra',
+  title: 'Web Automation & Scraping Guides — Orchestra Blog',
   description:
-    'Guides and notes on browser automation and web RPA — from the team building Orchestra.',
+    'Practical guides on browser automation, web scraping and web RPA — how to automate sites with no API, extract structured data, and export Playwright you own.',
   alternates: { canonical: '/blog' },
 }
 

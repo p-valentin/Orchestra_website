@@ -4,11 +4,12 @@ import Footer from '@/components/Footer'
 import ReleaseNotes from '@/components/ReleaseNotes'
 import { publishedReleases } from '@/lib/releases'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 export const metadata: Metadata = {
-  title: 'Release notes — Orchestra',
-  description: 'What changed in each Orchestra release.',
+  title: 'Orchestra Release Notes — Browser Automation Studio Changelog',
+  description:
+    'What changed in each release of Orchestra, the desktop browser automation and web scraping studio — new steps, fixes and export improvements.',
   alternates: { canonical: '/releases' },
 }
 

@@ -4,8 +4,13 @@ import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import Markdown from '@/components/Markdown'
 import { getPost } from '@/lib/blog'
+import { ORGANIZATION_ID, organizationSchema, jsonLdScript } from '@/lib/schema'
+import { SITE_URL } from '@/lib/site'
 
-export const dynamic = 'force-dynamic'
+// Posts change only when you publish in /admin, and publishing revalidates
+// this path. force-dynamic meant every Googlebot hit paid a cold R2 round-trip
+// and the CDN was told `no-store` — a crawl budget spent on nothing.
+export const revalidate = 3600
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -33,7 +38,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       publishedTime: post.publishedAt ?? undefined,
       modifiedTime: post.updatedAt,
       tags: post.tags?.length ? post.tags : undefined,
+      // Declaring an openGraph block here replaces the root one wholesale, so
+      // without this the pages most likely to be shared were the only ones
+      // shipping no preview image at all.
+      images: ['/opengraph-image'],
     },
+    twitter: { card: 'summary_large_image', images: ['/opengraph-image'] },
   }
 }
 
@@ -46,24 +56,28 @@ export default async function BlogPostPage({ params }: Props) {
   const post = await publishedPost(slug)
   if (!post) notFound()
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: post.title,
-    description: post.description,
-    datePublished: post.publishedAt,
-    dateModified: post.updatedAt,
-    url: `https://orchestra-automation.com/blog/${post.slug}`,
-    author: { '@type': 'Organization', name: 'Orchestra' },
-    publisher: { '@type': 'Organization', name: 'Orchestra', url: 'https://orchestra-automation.com' },
-    ...(post.tags?.length ? { keywords: post.tags.join(', ') } : {}),
-  }
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: post.title,
+      description: post.description,
+      datePublished: post.publishedAt,
+      dateModified: post.updatedAt,
+      url: `${SITE_URL}/blog/${post.slug}`,
+      mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/blog/${post.slug}` },
+      author: { '@id': ORGANIZATION_ID },
+      publisher: { '@id': ORGANIZATION_ID },
+      ...(post.tags?.length ? { keywords: post.tags.join(', ') } : {}),
+    },
+    organizationSchema(),
+  ]
 
   return (
     <div className="flex min-h-screen flex-col">
       <Nav />
       <main className="hero-light mx-auto w-full max-w-3xl flex-1 px-5 pb-32 pt-40 sm:px-8">
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
         <article>
           <a href="/blog" className="font-mono text-xs uppercase tracking-[0.18em] text-brass hover:text-brass-bright">
             ← Blog

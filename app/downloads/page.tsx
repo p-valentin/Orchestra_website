@@ -51,7 +51,7 @@ function LinuxIcon() {
   )
 }
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 export const metadata: Metadata = {
   title: 'Download Orchestra — Browser Automation for Mac, Windows & Linux',

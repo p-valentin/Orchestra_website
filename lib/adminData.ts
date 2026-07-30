@@ -110,6 +110,39 @@ export interface MailThread {
   rows: MailMessageRow[]
 }
 
+// The admin overview, in one shape. Counts only — this is the one payload from
+// the Edge Function that carries nothing identifying, which is why it needs no
+// masking and no reveal path.
+export interface AdminMetrics {
+  accounts: { total: number; confirmed: number; new_24h: number; new_7d: number; new_30d: number }
+  trials: {
+    total: number
+    running: number
+    started_7d: number
+    started_30d: number
+    expired_unconverted: number
+  }
+  // `paid` counts real provider orders; `granted` counts beta and legacy
+  // licences. Keeping them apart is the difference between "18 customers" and
+  // the truth. See migration 0011.
+  licenses: {
+    paid: number
+    granted: number
+    refunded: number
+    revoked: number
+    unattached: number
+    paid_30d: number
+  }
+  active: { dau: number; wau: number; mau: number; devices_total: number; devices_dau: number }
+  platforms: Record<string, number>
+  versions: Record<string, number>
+  /** Empty until the entitlement function has been writing check-ins for a day. */
+  dau_series: { day: string; active: number }[]
+  support: { threads: number; unread: number; sent_30d: number; send_failures_30d: number }
+  refunds: { total: number; submitted: number; refunded: number; failed: number }
+  generated_at: string
+}
+
 export const REASON_LABELS: Record<string, string> = {
   not_what_expected: 'Not what they expected',
   missing_feature: 'Missing a feature',
@@ -190,6 +223,14 @@ export async function listRefundRequests(limit = 50): Promise<RefundRow[] | null
 
 export async function listSentEmails(limit = 50, reveal = false): Promise<SentEmailRow[] | null> {
   return await query<SentEmailRow>('emails', limit, reveal)
+}
+
+// Everything the overview needs, in a single signed round-trip. Returns null on
+// any failure, which the page renders as em-dashes rather than an error state —
+// the dashboard being partly unavailable should not hide the parts that work.
+export async function getAdminMetrics(): Promise<AdminMetrics | null> {
+  const json = await call({ view: 'metrics' })
+  return (json?.metrics as AdminMetrics | undefined) ?? null
 }
 
 // ---------- the inbox ----------

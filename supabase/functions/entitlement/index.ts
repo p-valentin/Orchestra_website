@@ -274,6 +274,41 @@ async function upsertDevice(
   return { deviceId: created.id }
 }
 
+// Marks this device active today, for the admin dashboard's DAU history.
+//
+// devices.last_seen_at is a single overwritten column: it can say who is active
+// right now and nothing whatever about last Tuesday. One row per device per day
+// makes that history exist. ON CONFLICT DO NOTHING means the 5-minute heartbeat
+// writes once a day and no-ops for the rest, so the table grows by devices x
+// days rather than by heartbeats.
+//
+// FAILURES ARE SWALLOWED ON PURPOSE. This is analytics hanging off the endpoint
+// that gates all licensing; a metrics write must never be the reason somebody
+// cannot use the software they paid for. Worst case the dashboard undercounts a
+// day, which is a strictly better outcome than a false negative on entitlement.
+async function recordCheckin(
+  supabase: SupabaseClient,
+  deviceId: string,
+  platform: string | null,
+  appVersion: string | null,
+): Promise<void> {
+  try {
+    await supabase
+      .from('device_checkins')
+      .upsert(
+        {
+          device_id: deviceId,
+          day: new Date().toISOString().slice(0, 10),
+          platform,
+          app_version: appVersion,
+        },
+        { onConflict: 'device_id,day', ignoreDuplicates: true },
+      )
+  } catch (err) {
+    console.error('checkin write failed:', err instanceof Error ? err.message : err)
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return errorResponse(405, 'method_not_allowed')
 
@@ -313,6 +348,8 @@ Deno.serve(async (req) => {
 
     const device = await upsertDevice(supabase, user, { fingerprint, name, platform, appVersion }, mode)
     if ('error' in device) return device.error
+
+    await recordCheckin(supabase, device.deviceId, platform, appVersion)
 
     const privateKey = await privateKeyPromise
     if (!privateKey) return errorResponse(500, 'internal_error')

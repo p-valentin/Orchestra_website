@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { cache } from 'react'
 import { AwsClient } from 'aws4fetch'
 
 // Admin data lives in a PRIVATE R2 bucket (never the public downloads one).
@@ -28,6 +29,20 @@ export function storageMode(): 'r2' | 'local' {
 
 export async function readJson<T>(key: string, fallback: T): Promise<T> {
   return (await readJsonChecked(key, fallback)) ?? fallback
+}
+
+// Per-request memoized read, for pages that ask for the same object more than
+// once while rendering. React's cache() dedupes within a single request and
+// nothing beyond it, so this stays correct across deploys and users.
+//
+// DO NOT use this in a read-modify-write path. Those callers must see the
+// current object on every read; handing one a memoized copy is how two edits in
+// the same request end up with the second silently clobbering the first.
+// readJsonChecked is the one to use there, and it is deliberately not cached.
+const readJsonMemo = cache(async (key: string): Promise<unknown> => await readJsonChecked<unknown>(key, null))
+
+export async function readJsonCached<T>(key: string, fallback: T): Promise<T> {
+  return ((await readJsonMemo(key)) as T | null) ?? fallback
 }
 
 // Like readJson, but only a genuinely missing key yields `missing`; any other

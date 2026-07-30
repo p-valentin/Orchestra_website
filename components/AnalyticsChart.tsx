@@ -21,10 +21,16 @@ export interface HourPoint {
   downloads: number
 }
 
+export interface DauPoint {
+  day: string // YYYY-MM-DD
+  active: number
+}
+
 interface Point {
   key: string
   views: number
   downloads: number
+  active: number
 }
 
 type RangeId = '24h' | '7d' | '14d' | '30d' | '90d'
@@ -33,6 +39,7 @@ const RANGES: RangeId[] = ['24h', '7d', '14d', '30d', '90d']
 const SERIES = {
   views: { label: 'Views', color: '#b08a3f' },
   downloads: { label: 'Downloads', color: '#4a90c9' },
+  active: { label: 'Active devices', color: '#6cb079' },
 } as const
 
 function fmtHourLong(key: string): string {
@@ -117,12 +124,30 @@ function MiniChart({
   )
 }
 
-export default function AnalyticsChart({ days, hours }: { days: DayPoint[]; hours: HourPoint[] }) {
+export default function AnalyticsChart({
+  days,
+  hours,
+  dau = [],
+}: {
+  days: DayPoint[]
+  hours: HourPoint[]
+  dau?: DauPoint[]
+}) {
   const [range, setRange] = useState<RangeId>('30d')
   const hourly = range === '24h'
+  const activeByDay = new Map(dau.map(d => [d.day, d.active]))
   const points: Point[] = hourly
-    ? hours.slice(-24).map(h => ({ key: h.hour, views: h.views, downloads: h.downloads }))
-    : days.slice(-parseInt(range)).map(d => ({ key: d.day, views: d.views, downloads: d.downloads }))
+    ? hours.slice(-24).map(h => ({ key: h.hour, views: h.views, downloads: h.downloads, active: 0 }))
+    : days.slice(-parseInt(range)).map(d => ({
+      key: d.day,
+      views: d.views,
+      downloads: d.downloads,
+      active: activeByDay.get(d.day) ?? 0,
+    }))
+  // Device check-ins are a daily rollup, so there is nothing to plot against an
+  // hourly axis — and no history at all until the entitlement function has been
+  // writing them for a day.
+  const showDau = !hourly && dau.length > 0
   // Selection is stored from the end so switching range keeps the same moment.
   const [fromEnd, setFromEnd] = useState(1)
   const selected = points.length - Math.min(fromEnd, points.length)
@@ -172,12 +197,21 @@ export default function AnalyticsChart({ days, hours }: { days: DayPoint[]; hour
           <Key color={SERIES.views.color} /> <span className="font-semibold text-fg">{sel.views}</span> views
           <span className="mx-2 text-faint">·</span>
           <Key color={SERIES.downloads.color} /> <span className="font-semibold text-fg">{sel.downloads}</span> downloads
+          {showDau && (
+            <>
+              <span className="mx-2 text-faint">·</span>
+              <Key color={SERIES.active.color} /> <span className="font-semibold text-fg">{sel.active}</span> active
+            </>
+          )}
         </p>
       </div>
 
       <div className="mt-4 flex flex-col gap-4">
         <MiniChart points={points} metric="views" unit={hourly ? 'hr' : 'day'} selected={selected} onScrub={i => setFromEnd(points.length - i)} />
         <MiniChart points={points} metric="downloads" unit={hourly ? 'hr' : 'day'} selected={selected} onScrub={i => setFromEnd(points.length - i)} />
+        {showDau && (
+          <MiniChart points={points} metric="active" unit="day" selected={selected} onScrub={i => setFromEnd(points.length - i)} />
+        )}
       </div>
 
       <div className="mt-1.5 flex justify-between font-mono text-[11px] text-faint" aria-hidden>

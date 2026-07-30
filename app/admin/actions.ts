@@ -6,9 +6,6 @@ import { redirect } from 'next/navigation'
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/adminAuth'
 import { deleteRelease, saveRelease, setPublished } from '@/lib/releases'
 import { deleteFeedback } from '@/lib/feedback'
-import { grantLicense, revokeLicense } from '@/lib/licenseGrants'
-import { setLegacyClaims, TOTAL_LICENSES } from '@/lib/licenses'
-import { deleteClaim } from '@/lib/claims'
 import { deletePost, parseTags, savePost, setPostPublished, slugify, SLUG_RE } from '@/lib/blog'
 import { recordAudit } from '@/lib/audit'
 import { sendAsSupport } from '@/lib/email'
@@ -82,55 +79,11 @@ export async function deleteFeedbackAction(formData: FormData): Promise<void> {
   revalidatePath('/admin')
 }
 
-// Manual license fulfillment: after a $149 purchase lands, grant the buyer's
-// email here — the app's next login/refresh picks it up. Revoke handles
-// refunds/chargebacks; the app hard-blocks on its next refresh.
-export async function grantLicenseAction(formData: FormData): Promise<void> {
-  await requireAdmin()
-  const email = sanitizeText(formData.get('email'), 254).toLowerCase()
-  if (!isValidEmail(email)) redirect('/admin?error=invalid-email')
-  const note = sanitizeText(formData.get('note'), 200)
-  await grantLicense(email, 'admin', note || undefined)
-  await recordAudit('license-granted', email)
-  revalidatePath('/admin')
-}
-
-export async function revokeLicenseAction(formData: FormData): Promise<void> {
-  await requireAdmin()
-  const email = sanitizeText(formData.get('email'), 254).toLowerCase()
-  if (isValidEmail(email)) {
-    await revokeLicense(email)
-    await recordAudit('license-revoked', email)
-  }
-  revalidatePath('/admin')
-}
-
-// Reconcile control for claims that predate per-email records (before Jul
-// 2026): the derived public count is records + this offset.
-export async function deleteClaimAction(formData: FormData): Promise<void> {
-  await requireAdmin()
-  const email = sanitizeText(formData.get('email'), 254)
-  if (!isValidEmail(email)) return
-  await deleteClaim(email)
-  await recordAudit('claim-deleted', email)
-  revalidatePath('/admin')
-  revalidatePath('/')
-  revalidatePath('/downloads')
-}
-
-export async function setLegacyClaimsAction(formData: FormData): Promise<void> {
-  await requireAdmin()
-  const count = Number(formData.get('count'))
-  if (!Number.isInteger(count) || count < 0 || count > TOTAL_LICENSES) {
-    redirect('/admin?error=invalid-count')
-  }
-  const ok = await setLegacyClaims(count)
-  if (!ok) redirect('/admin?error=save-failed')
-  await recordAudit('legacy-claims-set', String(count))
-  revalidatePath('/admin')
-  revalidatePath('/')
-  revalidatePath('/downloads')
-}
+// The licence-grant, revoke, claim-delete and legacy-offset actions lived here.
+// They drove the Licenses tab, which fronted the pre-Supabase R2 licensing
+// store — a second, parallel account system that nothing has called since the
+// app moved to Supabase. Tab, actions and store are all gone; purchases now
+// come from Polar and are read through the admin-data Edge Function.
 
 function refreshBlog(slug?: string): void {
   revalidatePath('/admin')

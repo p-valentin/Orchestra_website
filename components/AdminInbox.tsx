@@ -4,6 +4,7 @@ import {
   listMailThreads,
   type MailMessageRow,
 } from '@/lib/adminData'
+import Link from 'next/link'
 import AdminReplyForm from '@/components/AdminReplyForm'
 import { markThreadReadAction } from '@/app/admin/actions'
 
@@ -121,7 +122,13 @@ export default async function AdminInbox({ openThreadId }: { openThreadId?: stri
     )
   }
 
-  const threads = await listMailThreads(50)
+  // Both at once. These do not depend on each other — the thread id comes from
+  // the URL, not from the list — so awaiting the list first made opening a
+  // conversation cost two serialized Edge Function round-trips for no reason.
+  const [threads, open] = await Promise.all([
+    listMailThreads(50),
+    openThreadId ? getMailThread(openThreadId) : Promise.resolve(null),
+  ])
 
   if (threads === null) {
     return (
@@ -153,8 +160,6 @@ export default async function AdminInbox({ openThreadId }: { openThreadId?: stri
     return b.last_message_at.localeCompare(a.last_message_at)
   })
 
-  const open = openThreadId ? await getMailThread(openThreadId) : null
-
   return (
     <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
       <div className={card}>
@@ -162,7 +167,7 @@ export default async function AdminInbox({ openThreadId }: { openThreadId?: stri
           {ordered.map((t) => {
             const active = open?.thread.id === t.id
             return (
-              <a
+              <Link
                 key={t.id}
                 href={`/admin?tab=email&thread=${t.id}`}
                 className={`flex flex-col gap-1 border-t border-line px-2 py-2.5 transition-colors first:border-t-0 ${
@@ -190,7 +195,7 @@ export default async function AdminInbox({ openThreadId }: { openThreadId?: stri
                     {when(t.last_message_at)}
                   </span>
                 </div>
-              </a>
+              </Link>
             )
           })}
         </div>

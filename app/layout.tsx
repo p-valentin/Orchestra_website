@@ -3,6 +3,7 @@ import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import TrackPageview from '@/components/TrackPageview'
+import { SITE_URL } from '@/lib/site'
 import './globals.css'
 
 const fraunces = Fraunces({
@@ -27,7 +28,7 @@ const jetbrains = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://orchestra-automation.com'),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'Orchestra — Build browser automations, export plain Playwright',
     template: '%s',
@@ -42,7 +43,7 @@ export const metadata: Metadata = {
       'A desktop app for building browser automations. Build the flow visually, watch it run in a real browser, export plain Playwright you own. No cloud, no subscription.',
     type: 'website',
     siteName: 'Orchestra',
-    url: 'https://orchestra-automation.com',
+    url: SITE_URL,
   },
   twitter: {
     card: 'summary_large_image',

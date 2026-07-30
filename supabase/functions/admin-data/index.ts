@@ -176,6 +176,25 @@ Deno.serve(async (req) => {
     })
   }
 
+  // The whole admin overview in one call.
+  //
+  // Every other view here is a table read with a fixed column list; this one is
+  // a single RPC because the alternative was seven named views and seven signed
+  // round-trips to render one page. The function it calls returns COUNTS ONLY —
+  // no emails, no ids, nothing identifying — so unlike purchases there is
+  // nothing to mask and the payload is safe to render and screenshot.
+  //
+  // See supabase/migrations/0011_admin_metrics.sql for what it computes and why
+  // paid and granted licences are counted separately.
+  if (request.view === 'metrics') {
+    const { data, error } = await supabase.rpc('admin_metrics')
+    if (error) {
+      console.error('[admin-data] metrics read failed:', error.message)
+      return notFound()
+    }
+    return Response.json({ view: 'metrics', metrics: data })
+  }
+
   if (request.view === 'refunds') {
     const { data, error } = await supabase
       .from('refund_requests')

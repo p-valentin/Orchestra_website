@@ -10,13 +10,29 @@ export interface StatsFile {
   // hour (YYYY-MM-DDTHH, UTC) → totals; kept 48h for the admin 24h chart.
   // Optional because stats.json files written before this field existed.
   hours?: Record<string, { views: number; downloads: number }>
+  // day → version → count. Answers "how did the last release land" without
+  // needing a second store. Optional for the same reason as `hours`: files
+  // written before this field existed must still parse.
+  versions?: Record<string, Record<string, number>>
 }
 
 const KEY = 'site/stats.json'
 const KEEP_DAYS = 90
 const KEEP_HOURS = 48
 
-const EMPTY: StatsFile = { downloads: {}, views: {}, referrers: {}, hours: {} }
+const EMPTY: StatsFile = { downloads: {}, views: {}, referrers: {}, hours: {}, versions: {} }
+
+// Crawlers, link unfurlers and prefetchers. They are not people downloading the
+// app, and counting them makes the one number the business cares about drift
+// upward for no reason. Deliberately a short list of things that SAY what they
+// are — fingerprinting real browsers to guess at intent would be both less
+// accurate and a worse thing to build.
+const BOT_UA = /bot|crawler|spider|crawling|slurp|curl|wget|python-requests|headlesschrome|facebookexternalhit|whatsapp|telegrambot|slackbot|discordbot|preview|monitor|pingdom|uptime|lighthouse|semrush|ahrefs|dataprovider|scrapy/i
+
+export function isBotUserAgent(userAgent: string | null): boolean {
+  if (!userAgent) return true // no UA at all is a script, not a person
+  return BOT_UA.test(userAgent)
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -47,11 +63,25 @@ export async function readStats(): Promise<StatsFile> {
   return readJson<StatsFile>(KEY, EMPTY)
 }
 
-export async function recordDownload(platform: string, country: string): Promise<void> {
+// One counted download. `version` is what was actually served, so the admin
+// page can show how a release landed rather than only how many downloads there
+// were in total.
+//
+// Worth being explicit, because it is the question this number always gets
+// asked: AUTO-UPDATES ARE NOT IN HERE. electron-updater fetches latest*.yml
+// straight from downloads.orchestra-automation.com and never touches this app,
+// so every row below is somebody choosing to install.
+export async function recordDownload(platform: string, country: string, version?: string): Promise<void> {
   const stats = await readStats()
   const day = (stats.downloads[today()] ??= {})
   const byCountry = (day[platform] ??= {})
   byCountry[country] = (byCountry[country] || 0) + 1
+  if (version) {
+    const versions = (stats.versions ??= {})
+    const byVersion = (versions[today()] ??= {})
+    byVersion[version] = (byVersion[version] || 0) + 1
+    prune(versions)
+  }
   bumpHour(stats, 'downloads')
   prune(stats.downloads)
   await writeJson(KEY, stats)
@@ -83,6 +113,18 @@ export function hourlySeries(stats: StatsFile, hoursBack = 24): { hour: string; 
     out.push({ hour, views: bucket?.views ?? 0, downloads: bucket?.downloads ?? 0 })
   }
   return out
+}
+
+// Downloads per version over the last `daysBack` days, most-downloaded first.
+export function versionRows(stats: StatsFile, daysBack = 30): [string, number][] {
+  const totals: Record<string, number> = {}
+  for (let i = daysBack - 1; i >= 0; i--) {
+    const day = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10)
+    for (const [version, n] of Object.entries(stats.versions?.[day] ?? {})) {
+      totals[version] = (totals[version] || 0) + n
+    }
+  }
+  return Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 10)
 }
 
 export interface StatsSummary {

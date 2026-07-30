@@ -1,4 +1,4 @@
-import { readJson, writeJson } from './store'
+import { readJson, readJsonCached, writeJson } from './store'
 import { VERSION } from './release'
 
 export interface Release {
@@ -14,9 +14,13 @@ interface ReleasesFile {
   releases: Release[]
 }
 
+// Cached: the admin page asks for the release list and the live version
+// separately, and /downloads and /releases each read it more than once per
+// render. One object, one fetch per request. The write paths below deliberately
+// keep using the uncached readJson.
 export async function listReleases(): Promise<Release[]> {
-  const data = await readJson<ReleasesFile>(KEY, { releases: [] })
-  return data.releases.sort((a, b) => compareVersions(b.version, a.version))
+  const data = await readJsonCached<ReleasesFile>(KEY, { releases: [] })
+  return [...data.releases].sort((a, b) => compareVersions(b.version, a.version))
 }
 
 export async function publishedReleases(): Promise<Release[]> {

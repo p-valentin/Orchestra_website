@@ -1,41 +1,21 @@
+import { Suspense } from 'react'
+import Link from 'next/link'
 import type { Metadata } from 'next'
-import NotesEditor from '@/components/NotesEditor'
-import ReleaseNotes from '@/components/ReleaseNotes'
-import { filesFor, type Platform } from '@/lib/release'
-import { listReleases, liveVersion, type Release } from '@/lib/releases'
-import { hourlySeries, readStats, summarize } from '@/lib/stats'
-import AnalyticsChart from '@/components/AnalyticsChart'
-import { getLicenseStatus } from '@/lib/licenses'
+import { liveVersion } from '@/lib/releases'
 import { storageMode } from '@/lib/store'
-import { readFeedback } from '@/lib/feedback'
-import FeedbackPanel from '@/components/FeedbackPanel'
-import { listGrants } from '@/lib/licenseGrants'
-import { listClaims } from '@/lib/claims'
-import { signLicense } from '@/lib/token'
-import CopyButton from '@/components/CopyButton'
-import { listAudit } from '@/lib/audit'
 import AdminCommerce from '@/components/AdminCommerce'
 import AdminEmailForm from '@/components/AdminEmailForm'
 import AdminInbox from '@/components/AdminInbox'
 import AdminAutoRefresh from '@/components/AdminAutoRefresh'
 import { adminDataConfigured, unreadMailCount } from '@/lib/adminData'
 import { sensitiveDataUnlocked } from '@/lib/totp'
-import { listPosts, type BlogPost } from '@/lib/blog'
-import {
-  deleteClaimAction,
-  deletePostAction,
-  deleteReleaseAction,
-  grantLicenseAction,
-  logoutAction,
-  publishPostAction,
-  revokeLicenseAction,
-  savePostAction,
-  saveReleaseAction,
-  setLegacyClaimsAction,
-  shipAction,
-  unpublishPostAction,
-  unshipAction,
-} from './actions'
+import OverviewTab from '@/components/admin/OverviewTab'
+import ReleasesTab from '@/components/admin/ReleasesTab'
+import BlogTab from '@/components/admin/BlogTab'
+import FeedbackTab from '@/components/admin/FeedbackTab'
+import ActivityTab from '@/components/admin/ActivityTab'
+import { card, section, TabSkeleton } from '@/components/admin/ui'
+import { logoutAction } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,232 +24,121 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-const PLATFORMS: Platform[] = ['mac', 'win', 'linux']
-
-async function binaryStatus(version: string): Promise<Record<Platform, boolean>> {
-  const base = process.env.R2_DOWNLOAD_BASE_URL
-  const out = { mac: false, win: false, linux: false }
-  if (!base) return out
-  await Promise.all(PLATFORMS.map(async platform => {
-    try {
-      const res = await fetch(`${base}/${encodeURIComponent(filesFor(version)[platform].name)}`, {
-        method: 'HEAD',
-        cache: 'no-store',
-      })
-      out[platform] = res.ok
-    } catch {}
-  }))
-  return out
-}
-
-const card = 'rounded-xl border border-line bg-panel p-4 sm:p-5'
-const th = 'pb-2 text-left font-mono text-[11px] uppercase tracking-wider text-faint'
-const td = 'border-t border-line py-1.5 pr-4 text-sm text-muted'
-const num = 'border-t border-line py-1.5 text-right font-mono text-sm text-fg'
-const btn = 'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors'
-const input = 'rounded-lg border border-line-strong bg-well px-3 py-2 font-mono text-sm text-fg outline-none focus:border-brass'
-const section = 'mt-8'
-
-// Tabs, not anchors. Every section used to render on every load, so reaching
-// a refund meant scrolling past three analytics tables — and the anchor nav had
-// already drifted out of step with the page (it listed neither Purchases nor
-// Email). One section at a time keeps the nav honest by construction: a tab
-// that is not in this list cannot be reached.
+// Tabs, not anchors, and each tab's data is fetched by the tab's own component.
 //
-// Driven by ?tab= rather than client state so the page stays a server
-// component, each view fetches only what it needs, and a particular tab can be
-// linked to or bookmarked.
+// It used to work the other way round: one unconditional nine-call Promise.all
+// at the top of this file ran for every view, so opening Email read ninety days
+// of stats, every claim, every grant, the audit log, all blog posts and all
+// releases out of R2 first — and then waited on a Supabase round-trip for the
+// unread badge before rendering a single pixel. The comment here claimed "each
+// view fetches only what it needs", which was true of exactly one line of it.
+//
+// Now the shell renders immediately and each section streams in under its own
+// <Suspense>. A slow tab can no longer hold up the rest of the page, and a tab
+// you are not looking at costs nothing at all.
 const TABS = [
+  ['email', 'Email'],
   ['overview', 'Overview'],
+  ['purchases', 'Purchases'],
   ['releases', 'Releases'],
   ['blog', 'Blog'],
-  ['licenses', 'Licenses'],
-  ['purchases', 'Purchases'],
-  ['email', 'Email'],
   ['feedback', 'Feedback'],
   ['activity', 'Activity'],
 ] as const
 
 type TabId = (typeof TABS)[number][0]
 
-const DEFAULT_TAB: TabId = 'overview'
+const DEFAULT_TAB: TabId = 'email'
 
 function resolveTab(value: string | undefined): TabId {
   return TABS.some(([id]) => id === value) ? (value as TabId) : DEFAULT_TAB
 }
 
-function formatDay(ms: number): string {
-  return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-  })
-}
-
-function StatTable({ title, rows, label }: { title: string; rows: [string, number][]; label: string }) {
-  const total = rows.reduce((sum, [, count]) => sum + count, 0)
-  return (
-    <div className={card}>
-      <h3 className="font-display text-lg font-medium">{title}</h3>
-      {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-faint">No data yet.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="mt-3 w-full">
-            <thead>
-              <tr>
-                <th className={th}>{label}</th>
-                <th className={`${th} text-right`}>Count</th>
-                <th className={`${th} w-16 text-right`}>Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(([key, count]) => (
-                <tr key={key}>
-                  <td className={td}>{key || '—'}</td>
-                  <td className={num}>{count}</td>
-                  <td className={`${num} text-faint`}>{total > 0 ? Math.round((count / total) * 100) : 0}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Period-over-period delta for a stat tile: signed, against the named prior
-// window, colored by direction (more views/downloads is always good here).
-function withTrend(current: number, previous: number, period: string): { sub: string; subCls: string } {
-  if (previous === 0 && current === 0) return { sub: `no change vs prior ${period}`, subCls: 'text-faint' }
-  if (previous === 0) return { sub: `▲ new vs prior ${period} (0)`, subCls: 'text-ok' }
-  const pct = Math.round(((current - previous) / previous) * 100)
-  if (pct > 0) return { sub: `▲ ${pct}% vs prior ${period}`, subCls: 'text-ok' }
-  if (pct < 0) return { sub: `▼ ${Math.abs(pct)}% vs prior ${period}`, subCls: 'text-[#f0a8a2]' }
-  return { sub: `flat vs prior ${period}`, subCls: 'text-faint' }
-}
-
-function ReleaseRow({ release, live, binaries }: { release: Release; live: string; binaries: Record<Platform, boolean> }) {
-  const isLive = release.publishedAt && release.version === live
-  return (
-    <div className="border-t border-line py-4 first:border-t-0">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="font-mono text-lg text-fg">v{release.version}</span>
-        {isLive ? (
-          <span className="rounded-full bg-ok/15 px-2.5 py-0.5 font-mono text-[11px] text-ok">live</span>
-        ) : release.publishedAt ? (
-          <span className="rounded-full bg-brass/15 px-2.5 py-0.5 font-mono text-[11px] text-brass">published</span>
-        ) : (
-          <span className="rounded-full bg-well px-2.5 py-0.5 font-mono text-[11px] text-faint">draft</span>
-        )}
-        <span className="font-mono text-xs text-faint">
-          {PLATFORMS.map(p => `${p} ${binaries[p] ? '✓' : '✗'}`).join(' · ')}
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          {release.publishedAt ? (
-            <form action={unshipAction}>
-              <input type="hidden" name="version" value={release.version} />
-              <button className={`${btn} border border-line-strong text-muted hover:text-fg`}>Unship</button>
-            </form>
-          ) : (
-            <>
-              <form action={shipAction}>
-                <input type="hidden" name="version" value={release.version} />
-                <button className={`${btn} bg-brass text-[#1a1306] hover:bg-brass-bright`}>Ship</button>
-              </form>
-              <form action={deleteReleaseAction}>
-                <input type="hidden" name="version" value={release.version} />
-                <button className={`${btn} border border-line text-faint hover:border-[#e06c63]/60 hover:text-[#f0a8a2]`}>Delete</button>
-              </form>
-            </>
-          )}
-        </div>
-      </div>
-      <div className="mt-3 rounded-lg border border-line-strong bg-well px-3 py-2">
-        {release.notes.trim() ? (
-          <ReleaseNotes text={release.notes} />
-        ) : (
-          <p className="text-sm text-faint">No notes yet.</p>
-        )}
-      </div>
-      <details className="mt-2">
-        <summary className="cursor-pointer font-mono text-xs text-faint hover:text-muted">edit notes</summary>
-        <form action={saveReleaseAction} className="mt-3 flex flex-col gap-2">
-          <input type="hidden" name="version" value={release.version} />
-          <NotesEditor key={release.notes} name="notes" rows={8} defaultValue={release.notes} />
-          <button className={`${btn} self-start border border-brass/50 text-brass-bright hover:bg-brass hover:text-[#1a1306]`}>
-            Save notes
-          </button>
-        </form>
-      </details>
-    </div>
-  )
-}
-
-function PostRow({ post }: { post: BlogPost }) {
-  return (
-    <div className="border-t border-line py-4 first:border-t-0">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="font-display text-lg text-fg">{post.title}</span>
-        {post.publishedAt ? (
-          <span className="rounded-full bg-ok/15 px-2.5 py-0.5 font-mono text-[11px] text-ok">published</span>
-        ) : (
-          <span className="rounded-full bg-well px-2.5 py-0.5 font-mono text-[11px] text-faint">draft</span>
-        )}
-        <span className="font-mono text-xs text-faint">/blog/{post.slug}</span>
-        <div className="ml-auto flex items-center gap-2">
-          {post.publishedAt ? (
-            <>
-              <a href={`/blog/${post.slug}`} className="font-mono text-xs text-muted hover:text-fg">view →</a>
-              <form action={unpublishPostAction}>
-                <input type="hidden" name="slug" value={post.slug} />
-                <button className={`${btn} border border-line-strong text-muted hover:text-fg`}>Unpublish</button>
-              </form>
-            </>
-          ) : (
-            <>
-              <form action={publishPostAction}>
-                <input type="hidden" name="slug" value={post.slug} />
-                <button className={`${btn} bg-brass text-[#1a1306] hover:bg-brass-bright`}>Publish</button>
-              </form>
-              <form action={deletePostAction}>
-                <input type="hidden" name="slug" value={post.slug} />
-                <button className={`${btn} border border-line text-faint hover:border-[#e06c63]/60 hover:text-[#f0a8a2]`}>Delete</button>
-              </form>
-            </>
-          )}
-        </div>
-      </div>
-      {post.description && <p className="mt-1 text-sm text-faint">{post.description}</p>}
-      {(post.tags?.length ?? 0) > 0 && (
-        <p className="mt-1 font-mono text-[11px] text-faint">{post.tags!.join(' · ')}</p>
-      )}
-      <details className="mt-2">
-        <summary className="cursor-pointer font-mono text-xs text-faint hover:text-muted">edit post</summary>
-        <form action={savePostAction} className="mt-3 flex flex-col gap-2">
-          <input type="hidden" name="slug" value={post.slug} />
-          <input name="title" defaultValue={post.title} required maxLength={120} className={`${input} w-full max-w-xl`} />
-          <input name="description" defaultValue={post.description} maxLength={200} placeholder="one-line description (meta + list page)" className={`${input} w-full max-w-xl`} />
-          <input name="tags" defaultValue={(post.tags ?? []).join(', ')} maxLength={400} placeholder="tags, comma-separated — shown on the post and fed to SEO keywords" className={`${input} w-full max-w-xl`} />
-          <NotesEditor key={post.updatedAt} name="body" rows={14} defaultValue={post.body} preview="article" />
-          <button className={`${btn} self-start border border-brass/50 text-brass-bright hover:bg-brass hover:text-[#1a1306]`}>
-            Save post
-          </button>
-        </form>
-      </details>
-    </div>
-  )
-}
-
 const ERROR_MESSAGES: Record<string, string> = {
   'invalid-version': 'That version doesn\'t look right — use the form X.Y.Z (e.g. 0.9.3).',
   'save-failed': 'Could not save — the release store is unavailable. Check storage configuration and try again.',
-  'invalid-email': 'That email doesn\'t look right — check it and try again.',
-  'invalid-count': 'Legacy claims must be a whole number between 0 and 50.',
   'invalid-post': 'The post needs a title (the URL slug is derived from it).',
+}
+
+// The badge is its own async component so the nav paints without waiting on a
+// Supabase round-trip. It used to be awaited inline before any tab rendered,
+// on every page load, whichever tab was open.
+async function UnreadBadge() {
+  if (!sensitiveDataUnlocked() || !adminDataConfigured()) return null
+  const unread = await unreadMailCount()
+  if (unread <= 0) return null
+  return (
+    <span
+      className="ml-1.5 rounded-full bg-brass px-1.5 py-0.5 text-[10px] font-semibold text-[#1a1306]"
+      aria-label={`${unread} unread`}
+    >
+      {unread}
+    </span>
+  )
+}
+
+async function LiveVersion() {
+  return <span className="font-mono text-xs text-faint">live v{await liveVersion()}</span>
+}
+
+function EmailTab({ thread }: { thread?: string }) {
+  if (!sensitiveDataUnlocked()) {
+    return (
+      <section id="email" className={section}>
+        <h2 className="font-display text-xl font-medium">Email</h2>
+        <div className={`${card} mt-4`}>
+          <p className="text-sm text-muted">
+            Hidden until two-factor authentication is enabled. Set ADMIN_TOTP_SECRET and sign in
+            again — customer correspondence, and a form that sends mail under your own domain,
+            are not things to leave behind a password alone.
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section id="email" className={section}>
+      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        <h2 className="font-display text-xl font-medium">Inbox</h2>
+        <span className="font-mono text-xs text-faint">
+          mail to hello@orchestra-automation.com · addresses masked · still forwarded to your mailbox
+        </span>
+      </div>
+      <Suspense fallback={<TabSkeleton rows={2} />}>
+        <AdminInbox openThreadId={thread} />
+      </Suspense>
+
+      <div className="mt-8 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        <h2 className="font-display text-xl font-medium">Start a new email</h2>
+        <span className="font-mono text-xs text-faint">
+          from hello@orchestra-automation.com · replies come back to the inbox above
+        </span>
+      </div>
+      <div className={`${card} mt-4`}>
+        <AdminEmailForm />
+      </div>
+    </section>
+  )
+}
+
+function TabBody({ active, thread }: { active: TabId; thread?: string }) {
+  switch (active) {
+    case 'email':
+      return <EmailTab thread={thread} />
+    case 'overview':
+      return <OverviewTab />
+    case 'purchases':
+      return <AdminCommerce />
+    case 'releases':
+      return <ReleasesTab />
+    case 'blog':
+      return <BlogTab />
+    case 'feedback':
+      return <FeedbackTab />
+    case 'activity':
+      return <ActivityTab />
+  }
 }
 
 export default async function AdminPage({
@@ -279,73 +148,18 @@ export default async function AdminPage({
 }) {
   const { error, tab, thread } = await searchParams
   const active = resolveTab(tab)
-  const [releases, live, stats, feedback, license, grants, claims, audit, posts] = await Promise.all([
-    listReleases(),
-    liveVersion(),
-    readStats(),
-    readFeedback(),
-    getLicenseStatus(),
-    listGrants(),
-    listClaims(),
-    listAudit(),
-    listPosts(),
-  ])
-  const summary = summarize(stats, 30)
-  const week = summarize(stats, 7)
-  const today = summarize(stats, 1)
-  const yesterday = summarize(stats, 1, 1)
-  const prevWeek = summarize(stats, 7, 7)
-  const prevMonth = summarize(stats, 30, 30)
-  const quarter = summarize(stats, 90)
-  const activeGrants = grants.filter(g => g.status === 'active').length
-  const conversion = summary.totalViews > 0
-    ? `${((summary.totalDownloads / summary.totalViews) * 100).toFixed(1)}%`
-    : '—'
-  const prevConversion = prevMonth.totalViews > 0
-    ? `${((prevMonth.totalDownloads / prevMonth.totalViews) * 100).toFixed(1)}% prior 30d`
-    : 'no prior data'
-  // Up to eight round-trips to R2 to see which platform binaries exist. Only
-  // the Releases tab shows them, so every other view used to pay for it.
-  const binaries = (active === 'releases'
-    ? Object.fromEntries(
-      await Promise.all(releases.slice(0, 8).map(async r => [r.version, await binaryStatus(r.version)])),
-    )
-    : {}) as Record<string, Record<Platform, boolean>>
-
-  // The badge on the Email tab. Fetched on every admin page load whichever tab
-  // is open, so it is its own view returning a single integer — no addresses,
-  // no bodies. Skipped entirely when the section it counts for is not reachable.
-  const unread = sensitiveDataUnlocked() && adminDataConfigured() ? await unreadMailCount() : 0
-
-  const claims7d = claims.filter(c => Date.now() - c.issuedAt < 7 * 86_400_000).length
-  const claims30d = claims.filter(c => Date.now() - c.issuedAt < 30 * 86_400_000).length
-  const claimsBySource = Object.entries(
-    claims.reduce<Record<string, number>>((acc, c) => ({ ...acc, [c.source]: (acc[c.source] ?? 0) + 1 }), {}),
-  ).sort((a, b) => b[1] - a[1])
-
-  const faint = 'text-faint'
-  const tiles: { label: string; value: string | number; sub: string; subCls: string }[] = [
-    { label: 'Views · today', value: today.totalViews, sub: `${yesterday.totalViews} yesterday`, subCls: faint },
-    { label: 'Downloads · today', value: today.totalDownloads, sub: `${yesterday.totalDownloads} yesterday`, subCls: faint },
-    { label: 'Views · 7d', value: week.totalViews, ...withTrend(week.totalViews, prevWeek.totalViews, '7d') },
-    { label: 'Downloads · 7d', value: week.totalDownloads, ...withTrend(week.totalDownloads, prevWeek.totalDownloads, '7d') },
-    { label: 'Views · 30d', value: summary.totalViews, ...withTrend(summary.totalViews, prevMonth.totalViews, '30d') },
-    { label: 'Downloads · 30d', value: summary.totalDownloads, ...withTrend(summary.totalDownloads, prevMonth.totalDownloads, '30d') },
-    { label: 'Conversion · 30d', value: conversion, sub: prevConversion, subCls: faint },
-    {
-      label: 'Licenses claimed', value: `${license.claimed}/${license.total}`,
-      sub: license.closed ? 'window closed' : license.cutoff ? `until ${formatDay(license.cutoff)}` : 'window open',
-      subCls: faint,
-    },
-  ]
+  const storage = storageMode()
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-4 pb-16 sm:px-8">
       <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1 pt-8">
         <h1 className="font-display text-2xl font-medium tracking-tight sm:text-3xl">Orchestra admin</h1>
-        <span className="font-mono text-xs text-faint">live v{live}</span>
-        <span className="font-mono text-xs text-faint">storage: {storageMode()}</span>
-        <AdminAutoRefresh />
+        <Suspense fallback={<span className="font-mono text-xs text-faint">live v…</span>}>
+          <LiveVersion />
+        </Suspense>
+        <span className="font-mono text-xs text-faint">storage: {storage}</span>
+        {/* Only where freshness earns the cost: new mail and moving numbers. */}
+        {(active === 'email' || active === 'overview') && <AdminAutoRefresh />}
         <div className="ml-auto flex items-center gap-4">
           <a href="/releases" className="font-mono text-xs text-muted hover:text-fg">/releases →</a>
           <form action={logoutAction}>
@@ -359,26 +173,21 @@ export default async function AdminPage({
         className="sticky top-0 z-10 -mx-4 mt-4 flex gap-1 overflow-x-auto border-b border-line bg-bg/90 px-4 py-2 backdrop-blur-md sm:-mx-8 sm:px-8"
       >
         {TABS.map(([id, label]) => (
-          <a
+          <Link
             key={id}
             href={id === DEFAULT_TAB ? '/admin' : `/admin?tab=${id}`}
             aria-current={active === id ? 'page' : undefined}
             className={`whitespace-nowrap rounded-md px-3 py-1 font-mono text-xs transition-colors ${
-              active === id
-                ? 'bg-well text-fg'
-                : 'text-muted hover:bg-well hover:text-fg'
+              active === id ? 'bg-well text-fg' : 'text-muted hover:bg-well hover:text-fg'
             }`}
           >
             {label}
-            {id === 'email' && unread > 0 && (
-              <span
-                className="ml-1.5 rounded-full bg-brass px-1.5 py-0.5 text-[10px] font-semibold text-[#1a1306]"
-                aria-label={`${unread} unread`}
-              >
-                {unread}
-              </span>
+            {id === 'email' && (
+              <Suspense fallback={null}>
+                <UnreadBadge />
+              </Suspense>
             )}
-          </a>
+          </Link>
         ))}
       </nav>
 
@@ -388,325 +197,16 @@ export default async function AdminPage({
         </p>
       )}
 
-      {storageMode() === 'local' && process.env.VERCEL && (
+      {storage === 'local' && process.env.VERCEL && (
         <p className="mt-4 rounded-lg border border-[#e06c63]/40 bg-[#e06c63]/10 px-4 py-3 text-sm text-[#f0a8a2]">
           R2 storage is not configured — data won&apos;t persist on Vercel. Set R2_ENDPOINT, R2_BUCKET,
           R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.
         </p>
       )}
 
-      {active === 'overview' && (
-      <section id="overview" className={section}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h2 className="font-display text-xl font-medium">Overview</h2>
-          <span className="font-mono text-xs text-faint">cookieless · aggregate only · no visitor IDs</span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          {tiles.map(tile => (
-            <div key={tile.label} className={card}>
-              <p className="font-mono text-[11px] uppercase tracking-wider text-faint">{tile.label}</p>
-              <p className="mt-1 font-display text-2xl text-fg sm:text-3xl">{tile.value}</p>
-              <p className={`mt-0.5 font-mono text-[11px] ${tile.subCls}`}>{tile.sub}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4">
-          <AnalyticsChart days={quarter.days} hours={hourlySeries(stats)} />
-        </div>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <StatTable title="Downloads by platform" label="Platform" rows={summary.byPlatform} />
-          <StatTable title="Top countries" label="Country" rows={summary.topCountries} />
-          <StatTable title="Top pages" label="Path" rows={summary.topPages} />
-          <StatTable title="Top referrers" label="Site" rows={summary.topReferrers} />
-        </div>
-      </section>
-      )}
-
-      {active === 'releases' && (
-      <section id="releases" className={section}>
-        <h2 className="font-display text-xl font-medium">Releases</h2>
-        <p className="mt-1 text-sm text-faint">
-          Drafts are invisible to visitors. Shipping flips /releases and the download links to the new version.
-        </p>
-
-        <div className={`${card} mt-4`}>
-          <h3 className="font-display text-lg font-medium">New release</h3>
-          <form action={saveReleaseAction} className="mt-3 flex flex-col gap-2">
-            <input
-              name="version"
-              placeholder="0.9.3"
-              pattern="\d+\.\d+\.\d+"
-              required
-              className={`${input} w-40`}
-            />
-            <NotesEditor
-              key={releases.length}
-              name="notes"
-              rows={6}
-              placeholder={'## Highlights\n- New Each mode iterates DOM elements\n- Text selectors now work without a <label>'}
-            />
-            <button className={`${btn} self-start bg-brass text-[#1a1306] hover:bg-brass-bright`}>Save draft</button>
-          </form>
-        </div>
-
-        <div className={`${card} mt-4`}>
-          {releases.length === 0 ? (
-            <p className="text-sm text-faint">No releases yet — save a draft above.</p>
-          ) : (
-            releases.map(r => (
-              <ReleaseRow
-                key={r.version}
-                release={r}
-                live={live}
-                binaries={binaries[r.version] ?? { mac: false, win: false, linux: false }}
-              />
-            ))
-          )}
-        </div>
-      </section>
-      )}
-
-      {active === 'blog' && (
-      <section id="blog" className={section}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h2 className="font-display text-xl font-medium">Blog</h2>
-          <span className="font-mono text-xs text-faint">
-            {posts.filter(p => p.publishedAt).length} published · drafts are invisible on /blog
-          </span>
-        </div>
-
-        <div className={`${card} mt-4`}>
-          <h3 className="font-display text-lg font-medium">New post</h3>
-          <form action={savePostAction} className="mt-3 flex flex-col gap-2">
-            <input name="title" placeholder="Post title" required maxLength={120} className={`${input} w-full max-w-xl`} />
-            <input name="description" placeholder="one-line description (meta + list page)" maxLength={200} className={`${input} w-full max-w-xl`} />
-            <input name="tags" placeholder="tags, comma-separated — shown on the post and fed to SEO keywords" maxLength={400} className={`${input} w-full max-w-xl`} />
-            <NotesEditor
-              key={posts.length}
-              name="body"
-              rows={10}
-              preview="article"
-              placeholder={'Write in markdown. First save creates a draft; publish when ready.'}
-            />
-            <button className={`${btn} self-start bg-brass text-[#1a1306] hover:bg-brass-bright`}>Save draft</button>
-          </form>
-        </div>
-
-        <div className={`${card} mt-4`}>
-          {posts.length === 0 ? (
-            <p className="text-sm text-faint">No posts yet — write one above.</p>
-          ) : (
-            posts.map(p => <PostRow key={p.slug} post={p} />)
-          )}
-        </div>
-      </section>
-      )}
-
-      {active === 'licenses' && (
-      <section id="licenses" className={section}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h2 className="font-display text-xl font-medium">Licenses</h2>
-          <span className="font-mono text-xs text-faint">
-            {activeGrants} active · grant after each purchase; the app picks it up on next sign-in or refresh
-          </span>
-        </div>
-
-        <div className={`${card} mt-4`}>
-          <form action={grantLicenseAction} className="flex flex-wrap items-center gap-2">
-            <input
-              name="email"
-              type="email"
-              placeholder="buyer@example.com"
-              required
-              className={`${input} w-full sm:w-64`}
-            />
-            <input
-              name="note"
-              placeholder="note (order ref, source…)"
-              className={`${input} w-full sm:w-56`}
-            />
-            <button className={`${btn} bg-brass text-[#1a1306] hover:bg-brass-bright`}>Grant lifetime</button>
-          </form>
-
-          {grants.length === 0 ? (
-            <p className="mt-4 text-sm text-faint">No licenses granted yet. Legacy free-window claims are honored separately and don&apos;t appear here.</p>
-          ) : (
-            <div className="mt-4">
-              {grants.map(g => (
-                <div key={g.email} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5">
-                  <span className="break-all font-mono text-sm text-muted">{g.email}</span>
-                  {g.status === 'active' ? (
-                    <span className="rounded-full bg-ok/15 px-2.5 py-0.5 font-mono text-[11px] text-ok">active</span>
-                  ) : (
-                    <span className="rounded-full bg-[#e06c63]/15 px-2.5 py-0.5 font-mono text-[11px] text-[#f0a8a2]">revoked</span>
-                  )}
-                  <span className="font-mono text-xs text-faint">{formatDay(g.createdAt)}</span>
-                  {g.note && <span className="text-xs text-faint">{g.note}</span>}
-                  <div className="ml-auto">
-                    {g.status === 'active' ? (
-                      <form action={revokeLicenseAction}>
-                        <input type="hidden" name="email" value={g.email} />
-                        <button className="font-mono text-xs text-faint hover:text-[#f0a8a2]">revoke</button>
-                      </form>
-                    ) : (
-                      <form action={grantLicenseAction}>
-                        <input type="hidden" name="email" value={g.email} />
-                        <button className="font-mono text-xs text-faint hover:text-ok">re-grant</button>
-                      </form>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-      )}
-
-      {active === 'email' && (
-      <section id="email" className={section}>
-        {sensitiveDataUnlocked() ? (
-          <>
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              <h2 className="font-display text-xl font-medium">Inbox</h2>
-              <span className="font-mono text-xs text-faint">
-                mail to hello@orchestra-automation.com · addresses masked · still forwarded to your
-                mailbox
-              </span>
-            </div>
-            <AdminInbox openThreadId={thread} />
-
-            <div className="mt-8 flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              <h2 className="font-display text-xl font-medium">Start a new email</h2>
-              <span className="font-mono text-xs text-faint">
-                from hello@orchestra-automation.com · replies come back to the inbox above
-              </span>
-            </div>
-            <div className={`${card} mt-4`}>
-              <AdminEmailForm />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              <h2 className="font-display text-xl font-medium">Email</h2>
-            </div>
-            <div className={`${card} mt-4`}>
-              <p className="text-sm text-muted">
-                Hidden until two-factor authentication is enabled. Set ADMIN_TOTP_SECRET and sign in
-                again — customer correspondence, and a form that sends mail under your own domain,
-                are not things to leave behind a password alone.
-              </p>
-            </div>
-          </>
-        )}
-      </section>
-      )}
-
-      {active === 'purchases' && <AdminCommerce />}
-
-      {active === 'licenses' && (
-      <section id="claims" className={section}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h2 className="font-display text-xl font-medium">Free-window claims</h2>
-          <span className="font-mono text-xs text-faint">
-            {license.recordedClaims} recorded + {license.legacyClaims} legacy = {license.claimed} of {license.total} claimed · {license.remaining} left
-          </span>
-          <span className="font-mono text-xs text-faint">
-            {claims7d} in last 7d · {claims30d} in last 30d
-            {claimsBySource.length > 0 && <> · by source: {claimsBySource.map(([source, n]) => `${source} ${n}`).join(' · ')}</>}
-          </span>
-        </div>
-
-        <div className={`${card} mt-4`}>
-          <form action={setLegacyClaimsAction} className="flex flex-wrap items-center gap-2">
-            <label htmlFor="legacy-count" className="text-sm text-muted">Legacy claims (before per-email records existed):</label>
-            <input
-              id="legacy-count"
-              name="count"
-              type="number"
-              min={0}
-              max={license.total}
-              defaultValue={license.legacyClaims}
-              required
-              className={`${input} w-24`}
-            />
-            <button className={`${btn} border border-brass/50 text-brass-bright hover:bg-brass hover:text-[#1a1306]`}>Save</button>
-          </form>
-          <p className="mt-2 text-xs text-faint">
-            Early claimers have no record below — this offset stands in for them. If one of them re-claims
-            in the app they gain a record; lower the offset by one then, or the count double-books.
-          </p>
-
-          {claims.length === 0 ? (
-            <p className="mt-4 text-sm text-faint">No recorded claims yet.</p>
-          ) : (
-            <div className="mt-4">
-              {claims.map(c => {
-                // Tokens are deterministic (same payload ⇒ same signature), so
-                // the key shown here is exactly what the claimer would have —
-                // copy it into a personal email to deliver their license.
-                const token = signLicense({ email: c.email, plan: c.plan, issuedAt: c.issuedAt })
-                return (
-                  <div key={c.email} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2.5">
-                    <span className="break-all font-mono text-sm text-muted">{c.email}</span>
-                    <span className="rounded-full bg-well px-2.5 py-0.5 font-mono text-[11px] text-faint">{c.source}</span>
-                    {token && <CopyButton text={token} label="copy key" />}
-                    <span className="ml-auto font-mono text-xs text-faint">{formatDay(c.issuedAt)}</span>
-                    <form action={deleteClaimAction}>
-                      <input type="hidden" name="email" value={c.email} />
-                      <button className="font-mono text-xs text-faint hover:text-[#f0a8a2]">remove</button>
-                    </form>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-      )}
-
-      {active === 'feedback' && (
-      <section id="feedback" className={section}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h2 className="font-display text-xl font-medium">Feedback &amp; testimonials</h2>
-          <span className="font-mono text-xs text-faint">{feedback.length} total · from the desktop app</span>
-        </div>
-        <div className="mt-4">
-          <FeedbackPanel entries={feedback} />
-        </div>
-      </section>
-      )}
-
-      {active === 'activity' && (
-      <section id="activity" className={section}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h2 className="font-display text-xl font-medium">Recent activity</h2>
-          <span className="font-mono text-xs text-faint">logins and admin actions · last {audit.length}</span>
-        </div>
-        <div className={`${card} mt-4`}>
-          {audit.length === 0 ? (
-            <p className="text-sm text-faint">Nothing yet — actions and logins will show up here.</p>
-          ) : (
-            <div>
-              {audit.map((entry, i) => (
-                <div key={`${entry.at}-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2 first:border-t-0">
-                  <span className="font-mono text-xs text-faint">{formatTime(entry.at)}</span>
-                  <span className={`rounded-full px-2.5 py-0.5 font-mono text-[11px] ${entry.action === 'login-failed' ? 'bg-[#e06c63]/15 text-[#f0a8a2]' : 'bg-well text-muted'}`}>
-                    {entry.action}
-                  </span>
-                  {entry.detail && <span className="break-all font-mono text-xs text-muted">{entry.detail}</span>}
-                  {entry.ip && <span className="ml-auto font-mono text-[11px] text-faint">{entry.ip}</span>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-      )}
+      <Suspense key={`${active}-${thread ?? ''}`} fallback={<TabSkeleton />}>
+        <TabBody active={active} thread={thread} />
+      </Suspense>
     </main>
   )
 }
