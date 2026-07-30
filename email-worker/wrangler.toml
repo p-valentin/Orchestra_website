@@ -1,0 +1,24 @@
+name = "orchestra-email"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+# nodejs_compat is what lets postal-mime's Buffer/stream use resolve inside the
+# Workers runtime. Without it the bundle builds and then fails at parse time.
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# The Supabase Edge Function this Worker posts to. Not a secret — it is a public
+# URL that 404s everything unsigned — so it lives here where it is reviewable.
+INGEST_URL = "https://jxcxtwmqwontjttywxlt.supabase.co/functions/v1/mail-ingest"
+
+# NOT declared here, on purpose — set with `wrangler secret put`:
+#
+#   FORWARD_TO           the owner's personal mailbox. A personal address does
+#                        not belong in a file that lives in version control,
+#                        even a private repo, so it is a secret rather than a
+#                        var. Must be a VERIFIED destination address in
+#                        Cloudflare Email Routing.
+#   MAIL_INGEST_SECRET   32+ chars, shared with the Supabase function of the
+#                        same name. Distinct from the website's
+#                        ADMIN_DATA_SECRET — see README.md.
+#
+# See README.md for the full deploy sequence.

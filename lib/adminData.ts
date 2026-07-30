@@ -58,6 +58,58 @@ export interface SentEmailRow {
   created_at: string
 }
 
+// A conversation with one person. Carries no message text on purpose — the
+// list view is a casually-read surface, and a preview would put customer
+// correspondence back onto it. Bodies arrive only from getThread().
+export interface MailThreadRow {
+  id: string
+  participant_email: string
+  subject: string
+  last_message_at: string
+  created_at: string
+  message_count: number
+  unread_count: number
+  last_direction: 'inbound' | 'outbound'
+}
+
+export interface MailMessageRow {
+  id: string
+  direction: 'inbound' | 'outbound'
+  from_email: string
+  // The From: header as received — free text a stranger wrote, and frequently
+  // containing an address, so the function withholds it unless unmasked.
+  from_header: string | null
+  to_email: string
+  subject: string
+  body_text: string
+  truncated: boolean
+  attachments: { name: string; size: number; type: string }[]
+  // The receiving MTA's SPF/DKIM/DMARC verdict. Evidence for the reader, never
+  // something this code branches on.
+  auth_results: string | null
+  read_at: string | null
+  created_at: string
+  sent_email_id: string | null
+}
+
+// One open conversation. `reply_subject` is computed by the Edge Function so
+// that subject normalisation has exactly one implementation — a second copy
+// here would, the day the two disagreed, start a new thread instead of
+// continuing this one.
+export interface MailThreadDetail {
+  id: string
+  participant_email: string
+  subject: string
+  reply_subject: string
+  last_message_at: string
+  created_at: string
+}
+
+export interface MailThread {
+  thread: MailThreadDetail
+  rows: MailMessageRow[]
+}
+
 export const REASON_LABELS: Record<string, string> = {
   not_what_expected: 'Not what they expected',
   missing_feature: 'Missing a feature',
@@ -73,7 +125,10 @@ export function adminDataConfigured(): boolean {
   return Boolean(secret && secret.length >= 32 && process.env.NEXT_PUBLIC_SUPABASE_URL)
 }
 
-async function query<T>(view: 'purchases' | 'refunds', limit: number, reveal: boolean): Promise<T[] | null> {
+// Signs and sends one request. Returns the parsed response, or null for
+// anything that did not work — the function 404s every failure by design, so
+// there is nothing more specific to hand back.
+async function call(payload: Record<string, unknown>): Promise<Record<string, unknown> | null> {
   const secret = process.env.ADMIN_DATA_SECRET
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!secret || !base) return null
@@ -85,7 +140,7 @@ async function query<T>(view: 'purchases' | 'refunds', limit: number, reveal: bo
     return null
   }
 
-  const body = JSON.stringify({ view, limit, reveal })
+  const body = JSON.stringify(payload)
   const ts = Math.floor(Date.now() / 1000)
   const bodyHash = createHash('sha256').update(body).digest('hex')
   const sig = createHmac('sha256', secret)
@@ -105,17 +160,21 @@ async function query<T>(view: 'purchases' | 'refunds', limit: number, reveal: bo
       cache: 'no-store',
     })
     if (!res.ok) {
-      // The function 404s every failure by design, so status alone cannot tell
-      // us whether the signature was wrong or the view was — log and move on.
-      console.error(`[admin-data] ${view} request rejected (${res.status})`)
+      // 404s everything, so status alone cannot tell us whether the signature
+      // was wrong or the view was — log and move on.
+      console.error(`[admin-data] ${payload.view} request rejected (${res.status})`)
       return null
     }
-    const json = await res.json()
-    return Array.isArray(json?.rows) ? (json.rows as T[]) : null
+    return (await res.json()) as Record<string, unknown>
   } catch (err) {
-    console.error(`[admin-data] ${view} request failed:`, err instanceof Error ? err.message : err)
+    console.error(`[admin-data] ${payload.view} request failed:`, err instanceof Error ? err.message : err)
     return null
   }
+}
+
+async function query<T>(view: string, limit: number, reveal: boolean): Promise<T[] | null> {
+  const json = await call({ view, limit, reveal })
+  return Array.isArray(json?.rows) ? (json.rows as T[]) : null
 }
 
 // `reveal` un-masks buyer emails. The admin page leaves it false by default so
@@ -131,6 +190,52 @@ export async function listRefundRequests(limit = 50): Promise<RefundRow[] | null
 
 export async function listSentEmails(limit = 50, reveal = false): Promise<SentEmailRow[] | null> {
   return await query<SentEmailRow>('emails', limit, reveal)
+}
+
+// ---------- the inbox ----------
+
+export async function listMailThreads(limit = 50, reveal = false): Promise<MailThreadRow[] | null> {
+  return await query<MailThreadRow>('threads', limit, reveal)
+}
+
+// The unread badge. Its own call because it is made on EVERY admin page load,
+// whichever tab is open, and "are there unread messages" has no business
+// dragging addresses or bodies across the wire to answer it. Returns 0 rather
+// than null on failure: a badge is not worth an error state.
+export async function unreadMailCount(): Promise<number> {
+  const json = await call({ view: 'mail-unread' })
+  return typeof json?.unread === 'number' ? json.unread : 0
+}
+
+// `reveal` is the deliberate act. The page renders masked; the REPLY path asks
+// for the real address server-side, so answering somebody never requires their
+// address to be rendered in a browser first.
+export async function getMailThread(id: string, reveal = false): Promise<MailThread | null> {
+  const json = await call({ view: 'thread', id, reveal })
+  if (!json?.thread || !Array.isArray(json.rows)) return null
+  return { thread: json.thread as MailThreadDetail, rows: json.rows as MailMessageRow[] }
+}
+
+export async function markThreadRead(id: string): Promise<boolean> {
+  const json = await call({ view: 'thread-read', id })
+  return json?.ok === true
+}
+
+// Records a send in the log — and, when it carries a body and actually went
+// out, files it into the conversation. One call, so "we sent something" has one
+// write path however it was triggered.
+export async function recordSentEmail(record: {
+  to_email: string
+  subject: string
+  status: 'sent' | 'failed'
+  provider_id?: string | null
+  error?: string | null
+  source?: string
+  body?: string
+  thread_id?: string | null
+}): Promise<boolean> {
+  const json = await call({ view: 'record-email', record })
+  return json?.ok === true
 }
 
 // Used by the admin page to gate the reveal toggle behind a second factor of

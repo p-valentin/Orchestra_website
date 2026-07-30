@@ -1,0 +1,17 @@
+{
+  "name": "orchestra-email-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "test": "deno test --allow-read --allow-net test/"
+  },
+  "dependencies": {
+    "postal-mime": "^2.7.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

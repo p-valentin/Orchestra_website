@@ -51,6 +51,14 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
     (b) => b.toString(16).padStart(2, '0'),
   ).join('')
 
+  // Distinct from adminDataSecret on purpose, and the tests assert it: the mail
+  // Worker is a different trust domain from the website, so a signature minted
+  // for one endpoint must not open the other.
+  const mailIngestSecret = Array.from(
+    crypto.getRandomValues(new Uint8Array(32)),
+    (b) => b.toString(16).padStart(2, '0'),
+  ).join('')
+
   const envFile = new URL('supabase/functions/.env.test', root)
   await Deno.writeTextFile(
     envFile,
@@ -66,6 +74,7 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
       'POLAR_API_KEY=polar_oat_test_dummy',
       'POLAR_API_BASE_URL=http://host.docker.internal:19998',
       `ADMIN_DATA_SECRET=${adminDataSecret}`,
+      `MAIL_INGEST_SECRET=${mailIngestSecret}`,
       // Dead endpoint on purpose: every claim-email send exercises the
       // best-effort failure path (§2.4) without touching the network.
       'RESEND_API_KEY=re_test_dummy',
@@ -84,6 +93,7 @@ export async function setupTestEnv(): Promise<{ envFile: string; keysFile: strin
         entitlementPublicJwk: entitlement.publicJwk,
         polarWebhookSecret,
         adminDataSecret,
+        mailIngestSecret,
       },
       null,
       2,

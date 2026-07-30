@@ -95,3 +95,11 @@ verify_jwt = false
 # failure returns 404, so this endpoint does not advertise itself.
 [functions.admin-data]
 verify_jwt = false
+
+# Called by the CLOUDFLARE EMAIL WORKER (email-worker/), which holds no Supabase
+# session either. Same HMAC scheme as admin-data but keyed on its own secret —
+# Cloudflare is a different trust domain from the website, so a compromise of
+# one does not hand over the other, and the two rotate independently. Every
+# failure returns 404.
+[functions.mail-ingest]
+verify_jwt = false

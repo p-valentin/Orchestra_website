@@ -16,6 +16,8 @@ import CopyButton from '@/components/CopyButton'
 import { listAudit } from '@/lib/audit'
 import AdminCommerce from '@/components/AdminCommerce'
 import AdminEmailForm from '@/components/AdminEmailForm'
+import AdminInbox from '@/components/AdminInbox'
+import { adminDataConfigured, unreadMailCount } from '@/lib/adminData'
 import { sensitiveDataUnlocked } from '@/lib/totp'
 import { listPosts, type BlogPost } from '@/lib/blog'
 import {
@@ -272,9 +274,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; tab?: string }>
+  searchParams: Promise<{ error?: string; tab?: string; thread?: string }>
 }) {
-  const { error, tab } = await searchParams
+  const { error, tab, thread } = await searchParams
   const active = resolveTab(tab)
   const [releases, live, stats, feedback, license, grants, claims, audit, posts] = await Promise.all([
     listReleases(),
@@ -308,6 +310,11 @@ export default async function AdminPage({
       await Promise.all(releases.slice(0, 8).map(async r => [r.version, await binaryStatus(r.version)])),
     )
     : {}) as Record<string, Record<Platform, boolean>>
+
+  // The badge on the Email tab. Fetched on every admin page load whichever tab
+  // is open, so it is its own view returning a single integer — no addresses,
+  // no bodies. Skipped entirely when the section it counts for is not reachable.
+  const unread = sensitiveDataUnlocked() && adminDataConfigured() ? await unreadMailCount() : 0
 
   const claims7d = claims.filter(c => Date.now() - c.issuedAt < 7 * 86_400_000).length
   const claims30d = claims.filter(c => Date.now() - c.issuedAt < 30 * 86_400_000).length
@@ -361,6 +368,14 @@ export default async function AdminPage({
             }`}
           >
             {label}
+            {id === 'email' && unread > 0 && (
+              <span
+                className="ml-1.5 rounded-full bg-brass px-1.5 py-0.5 text-[10px] font-semibold text-[#1a1306]"
+                aria-label={`${unread} unread`}
+              >
+                {unread}
+              </span>
+            )}
           </a>
         ))}
       </nav>
@@ -551,23 +566,41 @@ export default async function AdminPage({
 
       {active === 'email' && (
       <section id="email" className={section}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h2 className="font-display text-xl font-medium">Send an email</h2>
-          <span className="font-mono text-xs text-faint">
-            from hello@orchestra-automation.com · replies go back to that address
-          </span>
-        </div>
-        <div className={`${card} mt-4`}>
-          {sensitiveDataUnlocked() ? (
-            <AdminEmailForm />
-          ) : (
-            <p className="text-sm text-muted">
-              Hidden until two-factor authentication is enabled. Set ADMIN_TOTP_SECRET and sign in
-              again — a form that sends mail under your own domain is not something to leave behind
-              a password alone.
-            </p>
-          )}
-        </div>
+        {sensitiveDataUnlocked() ? (
+          <>
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+              <h2 className="font-display text-xl font-medium">Inbox</h2>
+              <span className="font-mono text-xs text-faint">
+                mail to hello@orchestra-automation.com · addresses masked · still forwarded to your
+                mailbox
+              </span>
+            </div>
+            <AdminInbox openThreadId={thread} />
+
+            <div className="mt-8 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+              <h2 className="font-display text-xl font-medium">Start a new email</h2>
+              <span className="font-mono text-xs text-faint">
+                from hello@orchestra-automation.com · replies come back to the inbox above
+              </span>
+            </div>
+            <div className={`${card} mt-4`}>
+              <AdminEmailForm />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+              <h2 className="font-display text-xl font-medium">Email</h2>
+            </div>
+            <div className={`${card} mt-4`}>
+              <p className="text-sm text-muted">
+                Hidden until two-factor authentication is enabled. Set ADMIN_TOTP_SECRET and sign in
+                again — customer correspondence, and a form that sends mail under your own domain,
+                are not things to leave behind a password alone.
+              </p>
+            </div>
+          </>
+        )}
       </section>
       )}
 

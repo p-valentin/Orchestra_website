@@ -163,7 +163,7 @@ export async function sendAsSupport(
   to: string,
   subject: string,
   body: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; id?: string }> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
     // NOT the dev fallback the other senders use. Those log-and-return-true so
@@ -220,7 +220,11 @@ export async function sendAsSupport(
       // verified) in a way it never is to a customer, so surface it here.
       return { ok: false, error: `Resend rejected it (${res.status}). ${detail.slice(0, 200)}` }
     }
-    return { ok: true }
+    // Resend's message id, kept because it is the handle for asking them what
+    // happened to a specific message — the thing you want when somebody says
+    // they never received it. Its absence is not an error: the send succeeded.
+    const id = await res.json().then((j) => (typeof j?.id === 'string' ? j.id : undefined)).catch(() => undefined)
+    return { ok: true, id }
   } catch (err) {
     console.error('[email] support send failed:', (err as Error).message)
     return { ok: false, error: 'Could not reach the mail service.' }

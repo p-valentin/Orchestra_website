@@ -1,0 +1,12 @@
+{
+  "//": "For `deno test test/` only. The Worker itself is bundled by wrangler from package.json; this file exists so the parsing tests run without an npm install.",
+  "nodeModulesDir": "none",
+  "fmt": {
+    "semiColons": false,
+    "singleQuote": true,
+    "lineWidth": 110
+  },
+  "imports": {
+    "postal-mime": "npm:postal-mime@2.7.5"
+  }
+}
