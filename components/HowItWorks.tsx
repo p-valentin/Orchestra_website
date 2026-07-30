@@ -2,7 +2,7 @@ const STEPS = [
   {
     n: '01',
     title: 'Compose your flow',
-    body: 'Pick from 44 instruments — navigate, click, extract, loop, branch. Point at any element in the embedded browser to grab its selector. No code, no boilerplate.',
+    body: 'Pick from the instrument palette — navigate, click, extract, loop, branch. Point at any element in the embedded browser to grab its selector. No code, no boilerplate.',
   },
   {
     n: '02',

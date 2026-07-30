@@ -30,9 +30,9 @@ function Row({ items, reverse }: { items: string[]; reverse?: boolean }) {
 
 export default function InstrumentMarquee() {
   return (
-    <section aria-label="The 44 instruments" className="border-y border-line py-10">
+    <section aria-label="The instrument palette" className="border-y border-line py-10">
       <p className="mb-7 text-center font-mono text-xs uppercase tracking-[0.18em] text-faint">
-        44 instruments · the full Playwright surface, one step at a time
+        The full Playwright surface, one step at a time
       </p>
       <div className="flex flex-col gap-3">
         <Row items={ROW_A} />
