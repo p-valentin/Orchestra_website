@@ -9,11 +9,14 @@ The forward is the point. `/admin` is a convenience on top of the mailbox, never
 a replacement for it — if ingest breaks, mail still arrives exactly where it
 always has.
 
-**The Supabase half is done and verified; the Cloudflare half is not.** The
-ingest function is deployed, its secret is set, and it has been smoke-tested
-against production. What remains is deploying this Worker and binding the route
-— Cloudflare credentials were not available in the session that built it.
-Steps 3–5 below have not been run against the live route.
+**Live since 2026-07-30.** The Worker is deployed, both secrets are set, and
+the `hello@` rule is bound to it. Verified with a real message end to end: it
+arrived in the forwarded mailbox as always, appeared as a thread in `/admin`,
+and a reply sent from there filed back into the same thread with a Resend id on
+its send-log row.
+
+The steps below are kept as the runbook for redeploying, rotating the secret,
+or rebuilding this from scratch.
 
 ---
 

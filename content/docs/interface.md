@@ -24,7 +24,7 @@ The top bar holds your **workspace tabs** on the left — each tab is a separate
 
 ## Instrument palette (left)
 
-All 43 instruments, grouped into eight categories. Click one to append it to the flow, or search by name. The palette can collapse to give the flow more room. Every instrument is documented in the [instrument reference](/docs/instruments/browser).
+All 44 instruments, grouped into eight categories. Click one to append it to the flow, or search by name. The palette can collapse to give the flow more room. Every instrument is documented in the [instrument reference](/docs/instruments/browser).
 
 ## Flow panel
 

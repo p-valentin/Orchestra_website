@@ -5,6 +5,12 @@ compatibility_date = "2026-07-01"
 # Workers runtime. Without it the bundle builds and then fails at parse time.
 compatibility_flags = ["nodejs_compat"]
 
+# No public HTTP endpoint. This Worker is triggered by the Email Routing
+# binding and by nothing else, so a <subdomain>.workers.dev URL would only be
+# attack surface on something holding MAIL_INGEST_SECRET — and wrangler asks to
+# register one on every deploy until this says otherwise.
+workers_dev = false
+
 [vars]
 # The Supabase Edge Function this Worker posts to. Not a secret — it is a public
 # URL that 404s everything unsigned — so it lives here where it is reviewable.

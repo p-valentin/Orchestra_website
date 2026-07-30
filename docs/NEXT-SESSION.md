@@ -16,7 +16,7 @@ Checked against production, not inferred:
 | Price | `$149`, confirmed on Polar's own checkout: $149 subtotal / $149 total, one-time |
 | Downloads | Linux / macOS / Windows all resolve to real files |
 | Auto-update | `latest.yml`, `latest-linux.yml`, `latest-mac.yml` all at 1.2.0 |
-| Website | `main` @ `72ccde5`, deployment READY and aliased to www — the three commits before it all failed to build, see below |
+| Website | `main` @ `9a41173`+, deployment READY and aliased to www — the three commits before `72ccde5` all failed to build, see below |
 | App | `main` @ `d3f7e6f`, tag `v1.2.0` |
 
 The 17 beta lifetime licences were emailed at 16:16 UTC — 17/17 accepted,
@@ -25,12 +25,17 @@ one message each, no BCC, recorded in `public.sent_emails` (source
 
 ---
 
-## The email system — shipped, except the Cloudflare half
+## The email system — shipped and live, end to end
 
 Both items that used to be listed here as unfinished (the inert `/admin` email
-log, and inbound mail) are now built. The website side is **live**; the
-inbound side is written and waiting on Cloudflare credentials, which this
-session did not have either.
+log, and inbound mail) are done, deployed and **carrying real mail**.
+
+Proven in production on 2026-07-30, not inferred: a real message to
+`hello@orchestra-automation.com` arrived in the forwarded mailbox exactly as
+before, appeared as a thread in `/admin`, and a reply sent from there went out
+from the support address and filed back into the same thread — with its
+send-log row carrying `status = sent` and a Resend message id, and the inbound
+row carrying none. The split holds on real data.
 
 ### What is live now
 
@@ -40,41 +45,36 @@ Verified against production, not inferred:
 |---|---|
 | migration `0010_mail_inbox` | applied — `mail_threads`, `mail_messages`, RLS on, no policies, no anon/authenticated grants |
 | `admin-data` | **v9 deployed** — `threads`, `thread`, `thread-read`, `mail-unread` added; `purchases`/`refunds` unchanged and still returning masked rows |
-| `mail-ingest` | **v2 deployed**, `verify_jwt = false`, 404s everything (its secret is not set — see below) |
-| `/admin?tab=email` | inbox + thread view + reply box + compose box, behind TOTP |
+| `mail-ingest` | deployed, `verify_jwt = false`, secret set; 404s every unsigned caller |
+| `/admin?tab=email` | inbox + thread view + reply box + compose box, behind TOTP; auto-refreshes every 15s |
+| Cloudflare Worker | **deployed and bound** to the `hello@` route; still forwards to the owner's mailbox |
 | Backend tests | **173 pass** (was 130) |
 | Worker tests | 5 pass, no Cloudflare account needed |
 
-### What still needs your hands
+### Operating it from here
 
-Everything left is Cloudflare, and it is all in **`email-worker/README.md`** —
-that file is the deploy runbook, written to be followed top to bottom.
+Nothing is outstanding. The things worth knowing:
 
-`MAIL_INGEST_SECRET` is **already minted and already set on Supabase**, and the
-live endpoint was smoke-tested with it end to end: a signed POST stored a
-message, a repeat of it deduplicated, a wrong key 404'd, the sanitiser stripped
-the script/pixel/`javascript:` payload, and the test row was deleted afterwards.
-The value sits at `~/.orchestra-mail-ingest-secret` (mode 600) and was never
-printed to a terminal or a transcript.
-
-So what is left is:
-
-- [ ] `cd email-worker && npm install && npx wrangler login`
-- [ ] note the address the `hello@` rule forwards to **before** changing it
-- [ ] `npx wrangler secret put MAIL_INGEST_SECRET < ~/.orchestra-mail-ingest-secret`
-- [ ] `npx wrangler secret put FORWARD_TO` — that address. A secret rather than a
-      `[vars]` entry because it is a personal mailbox and does not belong in a
-      file under version control.
-- [ ] `npx wrangler deploy`, then bind the route: Cloudflare → Email → Email
-      Routing → the `hello@` rule → **Send to a Worker** → `orchestra-email`.
-- [ ] verify with `wrangler tail` **and** an actual test message, checking all
-      three: no error in the tail, the mail still lands in the forwarded
-      mailbox, and it appears in `/admin?tab=email`.
-
-Until that route is bound, nothing changes: mail keeps arriving exactly where it
-does today, and the inbox tab simply stays empty.
-
-**Rollback is one dropdown** — set the routing rule back to *Send to an email*.
+- **Rollback is one dropdown.** Cloudflare → Email → Email Routing → the
+  `hello@` rule → Action: **Send to an email** → `valentin.a.pirva@gmail.com`.
+  Immediate. The Worker can stay deployed; unbound, it never runs.
+- **Do not delete `valentin.a.pirva@gmail.com` from Destination Addresses**,
+  even though no rule points at it any more. The Worker calls
+  `message.forward()` to it, and Cloudflare refuses a forward to an unverified
+  destination. If it ever loses verification the Worker throws, which defers the
+  mail rather than losing it — loud, but avoidable.
+- **`MAIL_INGEST_SECRET` lives at `~/.orchestra-mail-ingest-secret`** (mode 600)
+  and is set on both Supabase and Cloudflare. It was never printed to a terminal
+  or a transcript. `email-worker/README.md` §2 has the both-sides rotation
+  procedure; between the two commands mail forwards normally but does not reach
+  `/admin`.
+- **Debugging a message that did not appear:** `cd email-worker && npx wrangler
+  tail`, then send one. `ingest rejected (404)` means the two copies of the
+  secret have drifted. The mail itself is never at risk — the forward happens
+  first and ingest failures are swallowed.
+- **The Worker has no public URL** (`workers_dev = false`). It is reachable only
+  through the Email Routing binding, which is the point: it holds the ingest
+  secret.
 
 ### Design decisions worth knowing before changing anything
 
