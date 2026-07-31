@@ -160,13 +160,21 @@ export function adminDataConfigured(): boolean {
 
 // How long to wait on the Edge Function.
 //
-// Was 10 seconds, which is far too long for a page that renders this inside a
-// <Suspense> boundary and re-renders itself on a timer: a backend that stops
-// answering turned /admin into pulsing skeletons for ten seconds at a stretch,
-// then did it again on the next refresh, for ever. Four seconds is longer than
-// any healthy call here (measured: ~300-500ms) and short enough that failure
-// looks like failure instead of like a hang.
-const TIMEOUT_MS = 4_000
+// Ten seconds was too long: this renders inside a <Suspense> boundary on a page
+// that re-renders itself on a timer, so an unresponsive backend showed pulsing
+// skeletons for ten seconds at a stretch and then did it again, for ever.
+//
+// But four seconds was too SHORT in development, and for a reason that has
+// nothing to do with the network: Next compiles routes on demand, and that work
+// blocks the event loop. AbortSignal.timeout counts wall-clock time, so a cold
+// compile makes healthy calls "time out" — three in a row on the first page load
+// tripped the breaker below and produced thirty seconds of "backend
+// unreachable" against a backend answering in 400ms.
+//
+// So: generous in dev, where a pause usually means the bundler; strict in
+// production, where a slow call is a real fault and nothing else is competing
+// for the loop.
+const TIMEOUT_MS = process.env.NODE_ENV === 'production' ? 4_000 : 12_000
 
 // Circuit breaker.
 //
@@ -180,8 +188,14 @@ const TIMEOUT_MS = 4_000
 //
 // Module scope, so it is per server instance and resets on deploy. Deliberately
 // not shared state: this is a courtesy throttle, not a correctness mechanism.
+// Short in development, because the failure being absorbed there is usually the
+// bundler rather than the backend: the first render of a cold route can block
+// the event loop for longer than the request timeout, so an entirely healthy
+// call "times out" once and then works. Thirty seconds of pointless "backend
+// unreachable" after every server restart is a worse lie than the one this
+// breaker exists to prevent.
 const BREAKER_THRESHOLD = 3
-const BREAKER_COOLDOWN_MS = 30_000
+const BREAKER_COOLDOWN_MS = process.env.NODE_ENV === 'production' ? 30_000 : 5_000
 let consecutiveFailures = 0
 let breakerOpenUntil = 0
 
