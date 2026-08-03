@@ -71,9 +71,9 @@ export const LANDING_PAGES: LandingPage[] = [
               'Click an element in the live preview. Orchestra proposes a selector, shows you what it matches, and lets you loosen or tighten it before you commit.',
           },
           {
-            term: 'Extract List',
+            term: 'Extract',
             detail:
-              'Select one row and it generalises to all of them — products, listings, table rows, search results — with each field named the way you want it in the output.',
+              'Switch it to list mode, select one row, and it generalises to all of them — products, listings, table rows, search results — with each field named the way you want it in the output.',
           },
           {
             term: 'Each and pagination',
@@ -96,7 +96,7 @@ export const LANDING_PAGES: LandingPage[] = [
       {
         heading: 'You keep the code',
         body: [
-          'Every flow exports to plain Playwright — a readable TypeScript file with no Orchestra runtime, no SDK and no license check. Drop it in a repo, run it in CI, hand it to a developer, schedule it with cron.',
+          'Every flow exports to plain Playwright — a readable JavaScript file with no Orchestra runtime, no SDK and no license check. Drop it in a repo, run it in CI, hand it to a developer, schedule it with cron.',
           'That is the difference between a tool and a dependency. If Orchestra vanished tomorrow, your scrapers would keep running.',
         ],
       },
@@ -131,7 +131,7 @@ export const LANDING_PAGES: LandingPage[] = [
     related: [
       { href: '/web-automation', label: 'Browser automation beyond scraping' },
       { href: '/playwright-alternative', label: 'How it compares to writing Playwright by hand' },
-      { href: '/docs/instruments/extract-list', label: 'Docs: Extract List' },
+      { href: '/docs/instruments/data', label: 'Docs: Extract' },
     ],
   },
 
@@ -196,7 +196,7 @@ export const LANDING_PAGES: LandingPage[] = [
       {
         heading: 'Export, and stop depending on us',
         body: [
-          'Every flow exports as plain Playwright TypeScript — no runtime library, no license check, no proprietary format. Put it in version control, run it on a server, give it to a developer to extend.',
+          'Every flow exports as plain Playwright JavaScript — no runtime library, no license check, no proprietary format. Put it in version control, run it on a server, give it to a developer to extend.',
           'Most automation tools make leaving expensive on purpose. This one hands you the code as a feature.',
         ],
       },
@@ -287,7 +287,7 @@ export const LANDING_PAGES: LandingPage[] = [
         heading: 'The desktop alternative',
         body: [
           'Orchestra puts the same capability on the machine of the person who understands the process. They record the task, correct it where the recording guessed wrong, add the conditions and retries that make it survive a slow morning, and run it.',
-          'When a process outgrows the desktop, export it: the flow becomes plain Playwright TypeScript that a developer can schedule, containerise or wire into an existing pipeline. The upgrade path out of the tool is a feature, not an escape hatch nobody tells you about.',
+          'When a process outgrows the desktop, export it: the flow becomes plain Playwright JavaScript that a developer can schedule, containerise or wire into an existing pipeline. The upgrade path out of the tool is a feature, not an escape hatch nobody tells you about.',
         ],
       },
       {
@@ -328,7 +328,7 @@ export const LANDING_PAGES: LandingPage[] = [
     related: [
       { href: '/web-automation', label: 'The general web automation case' },
       { href: '/web-scraping', label: 'Extracting data as part of a process' },
-      { href: '/docs/instruments', label: 'Docs: the step reference' },
+      { href: '/docs/instruments/browser', label: 'Docs: the step reference' },
     ],
   },
 
@@ -336,7 +336,7 @@ export const LANDING_PAGES: LandingPage[] = [
     slug: 'playwright-alternative',
     title: 'Visual Playwright Builder — Record, Run and Export Real Code | Orchestra',
     description:
-      'Build Playwright automations visually and export plain TypeScript with no runtime lock-in. A faster way to write Playwright, not a replacement for it.',
+      'Build Playwright automations visually and export plain JavaScript with no runtime lock-in. A faster way to write Playwright, not a replacement for it.',
     keywords: [
       'playwright',
       'playwright alternative',
@@ -348,7 +348,7 @@ export const LANDING_PAGES: LandingPage[] = [
     ],
     h1: 'A visual way to build Playwright — and plain Playwright on the way out',
     lede:
-      'Orchestra is not a replacement for Playwright. It is a studio that builds flows visually and exports them as ordinary Playwright TypeScript, so the fast path and the portable path are the same path.',
+      'Orchestra is not a replacement for Playwright. It is a studio that builds flows visually and exports them as ordinary Playwright JavaScript, so the fast path and the portable path are the same path.',
     sections: [
       {
         heading: 'Playwright is excellent. Writing it is still slow.',
@@ -379,7 +379,7 @@ export const LANDING_PAGES: LandingPage[] = [
           {
             term: 'Readable export',
             detail:
-              'The output is TypeScript a person would write: named steps, real Playwright locators, no Orchestra imports and no runtime to install.',
+              'The output is JavaScript a person would write: named steps, real Playwright locators, JSDoc types for editor autocomplete, no Orchestra imports and no runtime to install.',
           },
         ],
       },
@@ -412,7 +412,7 @@ export const LANDING_PAGES: LandingPage[] = [
       {
         question: 'Is the exported code actually readable?',
         answer:
-          'Yes — plain TypeScript with real Playwright locators and named steps, with no Orchestra imports, no SDK and no licence check. It is meant to be handed to a developer and extended by hand.',
+          'Yes — plain JavaScript (CommonJS or ESM) with real Playwright locators and named steps, with no Orchestra imports, no SDK and no licence check. It is meant to be handed to a developer and extended by hand.',
       },
       {
         question: 'Can I run the exported code in CI?',

@@ -2,7 +2,7 @@ const CASES = [
   {
     title: 'Structured data extraction',
     body: 'Pull tables, listings and reports into clean JSON / CSV. Loops, pagination, the lot.',
-    tools: 'Extract List · Each · Output',
+    tools: 'Extract · Each · Output',
   },
   {
     title: 'Price & stock monitoring',
