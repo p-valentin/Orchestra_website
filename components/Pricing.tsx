@@ -88,8 +88,7 @@ export default function Pricing() {
         <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted">
           Your account is your license — buy while signed in and it attaches automatically, nothing
           to paste. Shown in USD; at checkout Polar (our merchant of record) charges in your local
-          currency and handles any tax. Claimed a free license during the beta? That promise stands
-          — yours stays free, forever.
+          currency and handles any tax.
         </p>
       </div>
     </section>

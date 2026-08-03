@@ -7,6 +7,10 @@ description: Short answers to common questions.
 
 No. There's a **14-day free trial** with every feature unlocked and no card required. After that, Orchestra is a one-time **$149** license: no subscription, no per-run fees, and it covers the updates that follow. The app is on the [downloads page](/downloads); [pricing](/#pricing) has the details.
 
+## I claimed a free license during the beta. Is it still valid?
+
+Yes, and it stays free forever. Beta licenses were granted permanently, and nothing about paid licensing revokes one. Sign in with the same account and it applies as it always did.
+
 ## What do I need to run it?
 
 A Mac (Apple Silicon or Intel), a Windows PC, or a Linux machine. That's it — the automation engine and browser are bundled. Node.js is only needed to run [exported scripts](/docs/code-export) outside the app.
