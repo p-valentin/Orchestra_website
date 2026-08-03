@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { track } from '@vercel/analytics'
 import { VERSION } from '@/lib/release'
+import { readSource } from '@/lib/attribution'
 
 type Platform = 'mac' | 'win' | 'linux'
 
@@ -117,8 +118,18 @@ function Notice({
 
 export default function DownloadButton({ platform, arch, label, className, version = VERSION }: Props) {
   const [open, setOpen] = useState(false)
-  const href = `/api/download?platform=${platform}&arch=${arch}`
+  const base = `/api/download?platform=${platform}&arch=${arch}`
+  // Rendered without the source on the server and filled in after mount:
+  // sessionStorage does not exist during SSR, and reading it inline would make
+  // the server and client markup disagree. The consequence of an unhydrated
+  // click is one download attributed as direct, not a broken download.
+  const [href, setHref] = useState(base)
   const needsNotice = platform === 'mac' || platform === 'win'
+
+  useEffect(() => {
+    const source = readSource()
+    setHref(source ? `${base}&ref=${encodeURIComponent(source)}` : base)
+  }, [base])
 
   const fireTrack = () => track('download_click', { version, platform, arch })
 

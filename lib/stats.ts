@@ -14,13 +14,20 @@ export interface StatsFile {
   // needing a second store. Optional for the same reason as `hours`: files
   // written before this field existed must still parse.
   versions?: Record<string, Record<string, number>>
+  // day → host → count, for downloads specifically. `referrers` tells you which
+  // channel produced traffic; this tells you which produced *installs*, and
+  // only the second one is worth steering on — a launch that sends 4,000
+  // readers and 12 installs and one that sends 400 readers and 90 installs look
+  // nearly identical in `referrers` and could not be more different. Optional
+  // for the same reason as `hours`: older files must still parse.
+  downloadReferrers?: Record<string, Record<string, number>>
 }
 
 const KEY = 'site/stats.json'
 const KEEP_DAYS = 90
 const KEEP_HOURS = 48
 
-const EMPTY: StatsFile = { downloads: {}, views: {}, referrers: {}, hours: {}, versions: {} }
+const EMPTY: StatsFile = { downloads: {}, views: {}, referrers: {}, hours: {}, versions: {}, downloadReferrers: {} }
 
 // Crawlers, link unfurlers and prefetchers. They are not people downloading the
 // app, and counting them makes the one number the business cares about drift
@@ -32,6 +39,23 @@ const BOT_UA = /bot|crawler|spider|crawling|slurp|curl|wget|python-requests|head
 export function isBotUserAgent(userAgent: string | null): boolean {
   if (!userAgent) return true // no UA at all is a script, not a person
   return BOT_UA.test(userAgent)
+}
+
+// The referrer hostname, or '' for direct / same-site / unparseable. Shared by
+// the pageview beacon and the download route so a visit and the install it
+// leads to land in the same bucket — if one of them normalised differently,
+// comparing views to downloads per channel would silently compare two
+// different things. `selfHost` is the site's own host, which is not a referral.
+export function refererHost(referer: string | null, selfHost: string | null): string {
+  if (!referer) return ''
+  try {
+    const host = new URL(referer).hostname
+    if (!host) return ''
+    if (selfHost && host.includes(selfHost)) return ''
+    return host.replace(/^www\./, '').slice(0, 100)
+  } catch {
+    return ''
+  }
 }
 
 function today(): string {
@@ -71,11 +95,22 @@ export async function readStats(): Promise<StatsFile> {
 // asked: AUTO-UPDATES ARE NOT IN HERE. electron-updater fetches latest*.yml
 // straight from downloads.orchestra-automation.com and never touches this app,
 // so every row below is somebody choosing to install.
-export async function recordDownload(platform: string, country: string, version?: string): Promise<void> {
+export async function recordDownload(
+  platform: string,
+  country: string,
+  version?: string,
+  referrerHost?: string,
+): Promise<void> {
   const stats = await readStats()
   const day = (stats.downloads[today()] ??= {})
   const byCountry = (day[platform] ??= {})
   byCountry[country] = (byCountry[country] || 0) + 1
+  if (referrerHost) {
+    const refs = (stats.downloadReferrers ??= {})
+    const byHost = (refs[today()] ??= {})
+    byHost[referrerHost] = (byHost[referrerHost] || 0) + 1
+    prune(refs)
+  }
   if (version) {
     const versions = (stats.versions ??= {})
     const byVersion = (versions[today()] ??= {})
@@ -135,6 +170,9 @@ export interface StatsSummary {
   topCountries: [string, number][]
   topPages: [string, number][]
   topReferrers: [string, number][]
+  // Which channel produced INSTALLS, not just visits. The pair of tables is the
+  // point: a source high in topReferrers and absent here sent readers, not users.
+  topDownloadReferrers: [string, number][]
 }
 
 // `offset` shifts the window back in time: summarize(stats, 7, 7) is the week
@@ -145,6 +183,7 @@ export function summarize(stats: StatsFile, daysBack: number, offset = 0): Stats
   const countries: Record<string, number> = {}
   const pages: Record<string, number> = {}
   const referrers: Record<string, number> = {}
+  const downloadReferrers: Record<string, number> = {}
 
   for (let i = daysBack - 1 + offset; i >= offset; i--) {
     const day = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10)
@@ -166,6 +205,9 @@ export function summarize(stats: StatsFile, daysBack: number, offset = 0): Stats
     for (const [host, n] of Object.entries(stats.referrers[day] || {})) {
       referrers[host] = (referrers[host] || 0) + n
     }
+    for (const [host, n] of Object.entries(stats.downloadReferrers?.[day] || {})) {
+      downloadReferrers[host] = (downloadReferrers[host] || 0) + n
+    }
     days.push({ day, views, downloads })
   }
 
@@ -180,5 +222,6 @@ export function summarize(stats: StatsFile, daysBack: number, offset = 0): Stats
     topCountries: top(countries),
     topPages: top(pages),
     topReferrers: top(referrers),
+    topDownloadReferrers: top(downloadReferrers),
   }
 }

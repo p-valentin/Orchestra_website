@@ -176,6 +176,11 @@ export default async function OverviewTab() {
         ) : (
           <StatTable title="Top referrers" label="Site" rows={summary.topReferrers} />
         )}
+        <StatTable
+          title="Downloads by source"
+          label="Source"
+          rows={summary.topDownloadReferrers}
+        />
         <StatTable title="Top pages" label="Path" rows={summary.topPages} />
         <StatTable title="Top countries" label="Country" rows={summary.topCountries} />
         {metrics && (
