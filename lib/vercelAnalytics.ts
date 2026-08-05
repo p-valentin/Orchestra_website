@@ -13,13 +13,20 @@
 // anonymized traffic." So reading it adds no tracking, needs no consent change,
 // and is simply using data we already collect.
 //
-// Requires VERCEL_ANALYTICS_TOKEN (a read-scoped Vercel API token). Without it
+// Requires ANALYTICS_API_TOKEN (a read-scoped Vercel API token). Without it
 // every function here returns null and the page renders em-dashes — the
 // dashboard degrades rather than breaks, the same way adminDataConfigured does.
 
 import { unstable_cache } from 'next/cache'
 
-const API = 'https://vercel.com/api/web-analytics'
+// The documented Web Analytics query API.
+//
+// Verified by probing: /visits/count and /visits/aggregate answer 403 and 400
+// unauthenticated (real endpoints, rejecting the request), where a wrong path
+// answers 404. Worth stating because the first version of this file called
+// https://vercel.com/api/web-analytics/... which does not exist at all — it
+// would have returned null for ever, and looked exactly like a bad token.
+const API = 'https://api.vercel.com/v1/query/web-analytics'
 
 // Ten minutes. This is trend data on a page that auto-refreshes; re-querying a
 // third-party API every time the poller ticks would be rude to them and slow
@@ -36,22 +43,36 @@ export interface ReferrerRow {
   visitors: number
 }
 
+// NOTE ON THE NAMES: none of these may begin with VERCEL_.
+//
+// Vercel reserves that prefix for its own system variables and refuses to
+// create user variables using it, so the obvious name — VERCEL_ANALYTICS_TOKEN
+// — cannot be added in the dashboard at all. Hence ANALYTICS_*.
+//
+// VERCEL_PROJECT_ID is the one exception, and only because we READ it rather
+// than set it: Vercel injects it into every deployment automatically, so in
+// production the project id needs no configuration. ANALYTICS_PROJECT_ID is the
+// escape hatch for running this anywhere else.
 export function analyticsConfigured(): boolean {
-  return Boolean(process.env.VERCEL_ANALYTICS_TOKEN && projectId())
+  return Boolean(token() && projectId())
+}
+
+function token(): string | undefined {
+  return process.env.ANALYTICS_API_TOKEN
 }
 
 function projectId(): string | undefined {
-  return process.env.VERCEL_PROJECT_ID || process.env.NEXT_PUBLIC_VERCEL_PROJECT_ID
+  return process.env.ANALYTICS_PROJECT_ID || process.env.VERCEL_PROJECT_ID
 }
 
 function teamId(): string | undefined {
-  return process.env.VERCEL_TEAM_ID
+  return process.env.ANALYTICS_TEAM_ID
 }
 
 async function get(path: string, params: Record<string, string>): Promise<unknown | null> {
-  const token = process.env.VERCEL_ANALYTICS_TOKEN
+  const apiToken = token()
   const project = projectId()
-  if (!token || !project) return null
+  if (!apiToken || !project) return null
 
   const query = new URLSearchParams({ ...params, projectId: project })
   const team = teamId()
@@ -59,7 +80,7 @@ async function get(path: string, params: Record<string, string>): Promise<unknow
 
   try {
     const res = await fetch(`${API}${path}?${query}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${apiToken}` },
       // Short: the admin page must never sit waiting on somebody else's API.
       signal: AbortSignal.timeout(6_000),
       cache: 'no-store',
@@ -80,7 +101,7 @@ function isoDaysAgo(days: number): string {
 }
 
 async function fetchTotals(days: number): Promise<VisitorTotals | null> {
-  const json = (await get('/count', {
+  const json = (await get('/visits/count', {
     since: isoDaysAgo(days),
     until: new Date().toISOString(),
   })) as { data?: { visitors?: number; pageviews?: number } } | null
@@ -90,15 +111,18 @@ async function fetchTotals(days: number): Promise<VisitorTotals | null> {
 }
 
 async function fetchReferrers(days: number, limit: number): Promise<ReferrerRow[] | null> {
-  const json = (await get('/aggregate', {
+  const json = (await get('/visits/aggregate', {
     since: isoDaysAgo(days),
     until: new Date().toISOString(),
-    by: 'referrerHostname',
+    groupBy: 'referrerHostname',
     limit: String(limit),
-  })) as { data?: { referrerHostname?: string; visitors?: number }[] } | null
+  })) as { data?: { referrerHostname?: string; visitors?: number; count?: number }[] } | null
   if (!Array.isArray(json?.data)) return null
   return json.data
-    .map(row => ({ host: row.referrerHostname || 'direct', visitors: row.visitors ?? 0 }))
+    // The aggregate rows carry `visitors`; `count` is the fallback for the
+    // event-shaped response, so a schema change degrades to a smaller number
+    // rather than to zeroes everywhere.
+    .map(row => ({ host: row.referrerHostname || 'direct', visitors: row.visitors ?? row.count ?? 0 }))
     .filter(row => row.visitors > 0)
 }
 

@@ -39,7 +39,7 @@ function trafficTiles(
       : {
         label: 'Unique visitors · 30d',
         value: '—',
-        sub: 'set VERCEL_ANALYTICS_TOKEN',
+        sub: 'set ANALYTICS_API_TOKEN',
         subCls: faint,
       },
     { label: 'Pageviews · 30d', value: stats.totalViews, ...withTrend(stats.totalViews, prior.totalViews, '30d') },
