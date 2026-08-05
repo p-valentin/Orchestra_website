@@ -27,14 +27,21 @@ function trafficTiles(
   stats: ReturnType<typeof summarize>,
   prior: ReturnType<typeof summarize>,
   uniques: { visitors: number; pageviews: number } | null,
-  priorUniques: { visitors: number; pageviews: number } | null,
+  recent: { visitors: number; pageviews: number } | null,
 ): Tile[] {
   return [
     uniques
       ? {
         label: 'Unique visitors · 30d',
         value: uniques.visitors,
-        ...withTrend(uniques.visitors, priorUniques?.visitors ?? 0, '30d'),
+        // No period-over-period arrow here on purpose. The Hobby plan only
+        // exposes the latest 31 days, so the prior 30 cannot be fetched at
+        // all — and a trend computed against a window we cannot see reads
+        // "▲ new vs prior 30d (0)", which says the traffic is brand new when
+        // the truth is that we simply have no view of it. A real subset of
+        // the window we DO have is worth more than an invented comparison.
+        sub: recent ? `${recent.visitors} in the last 7 days` : 'real people, de-duplicated',
+        subCls: faint,
       }
       : {
         label: 'Unique visitors · 30d',
@@ -108,29 +115,17 @@ function usageTiles(metrics: AdminMetrics): Tile[] {
 
 export default async function OverviewTab() {
   const metricsAvailable = sensitiveDataUnlocked() && adminDataConfigured()
-  const [stats, metrics, uniques, priorUniques, referrers] = await Promise.all([
+  const [stats, metrics, uniques, recentUniques, referrers] = await Promise.all([
     readStats(),
     metricsAvailable ? getAdminMetrics() : Promise.resolve(null),
     analyticsConfigured() ? visitorTotals(30) : Promise.resolve(null),
-    analyticsConfigured() ? visitorTotals(60) : Promise.resolve(null),
+    analyticsConfigured() ? visitorTotals(7) : Promise.resolve(null),
     analyticsConfigured() ? topReferrers(30, 10) : Promise.resolve(null),
   ])
 
   const summary = summarize(stats, 30)
   const prevMonth = summarize(stats, 30, 30)
   const quarter = summarize(stats, 90)
-
-  // visitorTotals(60) is the trailing 60 days, so the prior 30 is the
-  // difference. Subtracting is not exactly right for uniques — somebody who
-  // visited in both windows is counted once in the 60-day figure — but it is
-  // directionally honest and the alternative is a second API shape for a
-  // trend arrow.
-  const priorWindow = uniques && priorUniques
-    ? {
-      visitors: Math.max(priorUniques.visitors - uniques.visitors, 0),
-      pageviews: Math.max(priorUniques.pageviews - uniques.pageviews, 0),
-    }
-    : null
 
   return (
     <section id="overview" className={section}>
@@ -141,7 +136,7 @@ export default async function OverviewTab() {
         </span>
       </div>
 
-      <TileGrid heading="Traffic" tiles={trafficTiles(summary, prevMonth, uniques, priorWindow)} />
+      <TileGrid heading="Traffic" tiles={trafficTiles(summary, prevMonth, uniques, recentUniques)} />
 
       {metrics ? (
         <>

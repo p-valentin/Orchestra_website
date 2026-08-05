@@ -114,7 +114,11 @@ async function fetchReferrers(days: number, limit: number): Promise<ReferrerRow[
   const json = (await get('/visits/aggregate', {
     since: isoDaysAgo(days),
     until: new Date().toISOString(),
-    groupBy: 'referrerHostname',
+    // `by`, not `groupBy`. The docs show groupBy in the RESPONSE echo, which is
+    // not the request parameter — sending groupBy returns
+    // "Invalid request: missing required property `by`". Verified against the
+    // live API.
+    by: 'referrerHostname',
     limit: String(limit),
   })) as { data?: { referrerHostname?: string; visitors?: number; count?: number }[] } | null
   if (!Array.isArray(json?.data)) return null
