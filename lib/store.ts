@@ -71,6 +71,93 @@ export async function readJsonChecked<T>(key: string, missing: T): Promise<T | n
   }
 }
 
+// Read-modify-write that cannot lose a concurrent update.
+//
+// The naive version — read, mutate, write — has two failure modes, and this
+// store has been bitten by both:
+//
+//   1. a failed READ that looks like an empty store, so the write replaces
+//      everything. readJsonChecked closes that one: null means "don't write".
+//   2. two writers reading the same version and both writing back, so whichever
+//      lands second silently discards the other's increment. On a page counter
+//      under any burst at all, that is most of the traffic.
+//
+// The fix for (2) is a conditional PUT. R2 honours If-Match, so the write only
+// lands if the object is still the version we read; If-None-Match: * covers the
+// first write, when there is nothing there yet. A 412 means somebody beat us,
+// so we re-read and reapply rather than overwrite them.
+//
+// `mutate` must be pure enough to run more than once — it is handed a fresh
+// copy of the current state on every attempt.
+//
+// Local mode does the plain read-modify-write: one process, no concurrency to
+// lose anything to.
+export async function updateJson<T>(
+  key: string,
+  missing: T,
+  mutate: (current: T) => void,
+  attempts = 5,
+): Promise<boolean> {
+  const r2 = r2Config()
+
+  if (!r2) {
+    const current = await readJsonChecked<T>(key, missing)
+    if (current === null) return false
+    mutate(current)
+    return writeJson(key, current)
+  }
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    let current: T
+    let etag: string | null
+    try {
+      const res = await r2.client.fetch(`${r2.url}/${key}`)
+      if (res.status === 404) {
+        current = missing
+        etag = null
+      } else if (res.ok) {
+        current = (await res.json()) as T
+        etag = res.headers.get('etag')
+      } else {
+        throw new Error(`R2 read ${key}: ${res.status}`)
+      }
+    } catch (err) {
+      console.error('[store] update read failed:', (err as Error).message)
+      return false
+    }
+
+    mutate(current)
+
+    try {
+      const res = await r2.client.fetch(`${r2.url}/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify(current),
+        headers: {
+          'content-type': 'application/json',
+          // Exactly one of these: match the version we read, or require that
+          // nothing exists yet.
+          ...(etag ? { 'if-match': etag } : { 'if-none-match': '*' }),
+        },
+      })
+      if (res.ok) return true
+      // 412 (and 409, which R2 can return for a racing create) mean another
+      // writer got there first. Re-read and reapply.
+      if (res.status === 412 || res.status === 409) {
+        // Small jittered backoff so simultaneous writers don't lockstep.
+        await new Promise(resolve => setTimeout(resolve, 15 + Math.random() * 60))
+        continue
+      }
+      throw new Error(`R2 conditional write ${key}: ${res.status}`)
+    } catch (err) {
+      console.error('[store] update write failed:', (err as Error).message)
+      return false
+    }
+  }
+
+  console.error(`[store] update gave up on ${key} after ${attempts} attempts`)
+  return false
+}
+
 // Lists object keys under a prefix (e.g. 'site/claims/'). R2 uses S3
 // ListObjectsV2 with continuation; local mode walks the directory. Errors
 // return [] so callers degrade the same way readJson does.

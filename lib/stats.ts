@@ -1,4 +1,4 @@
-import { readJson, writeJson } from './store'
+import { readJson, updateJson } from './store'
 
 // First-party, cookieless counters: nothing identifies a visitor — only
 // aggregate counts per day, bucketed by platform/page/country/referrer.
@@ -83,9 +83,27 @@ function prune(section: Record<string, unknown>): void {
   }
 }
 
+// For READING. A transient failure here shows an empty dashboard for one
+// render, which is harmless and self-correcting.
 export async function readStats(): Promise<StatsFile> {
   return readJson<StatsFile>(KEY, EMPTY)
 }
+
+// Both counters below go through updateJson, which reads, applies the change,
+// and writes CONDITIONALLY on the object not having moved underneath it.
+//
+// This module previously did a plain read-modify-write through readJson, and
+// lost data two different ways:
+//
+//   - readJson turns any failure into EMPTY, so one transient read error made
+//     the next write replace the whole file with a single hit. Not an
+//     undercount — a silent delete, repeating on every blip. That is why daily
+//     views kept collapsing to ~1 while Vercel Analytics saw a normal day.
+//   - two hits arriving together both read the same version and both wrote, so
+//     one increment vanished. Ordinary on any page with a burst of traffic.
+//
+// store.ts spells out the first hazard, and audit.ts and blog.ts both respect
+// it. This file did not.
 
 // One counted download. `version` is what was actually served, so the admin
 // page can show how a release landed rather than only how many downloads there
@@ -101,40 +119,40 @@ export async function recordDownload(
   version?: string,
   referrerHost?: string,
 ): Promise<void> {
-  const stats = await readStats()
-  const day = (stats.downloads[today()] ??= {})
-  const byCountry = (day[platform] ??= {})
-  byCountry[country] = (byCountry[country] || 0) + 1
-  if (referrerHost) {
-    const refs = (stats.downloadReferrers ??= {})
-    const byHost = (refs[today()] ??= {})
-    byHost[referrerHost] = (byHost[referrerHost] || 0) + 1
-    prune(refs)
-  }
-  if (version) {
-    const versions = (stats.versions ??= {})
-    const byVersion = (versions[today()] ??= {})
-    byVersion[version] = (byVersion[version] || 0) + 1
-    prune(versions)
-  }
-  bumpHour(stats, 'downloads')
-  prune(stats.downloads)
-  await writeJson(KEY, stats)
+  await updateJson<StatsFile>(KEY, EMPTY, stats => {
+    const day = (stats.downloads[today()] ??= {})
+    const byCountry = (day[platform] ??= {})
+    byCountry[country] = (byCountry[country] || 0) + 1
+    if (referrerHost) {
+      const refs = (stats.downloadReferrers ??= {})
+      const byHost = (refs[today()] ??= {})
+      byHost[referrerHost] = (byHost[referrerHost] || 0) + 1
+      prune(refs)
+    }
+    if (version) {
+      const versions = (stats.versions ??= {})
+      const byVersion = (versions[today()] ??= {})
+      byVersion[version] = (byVersion[version] || 0) + 1
+      prune(versions)
+    }
+    bumpHour(stats, 'downloads')
+    prune(stats.downloads)
+  })
 }
 
 export async function recordView(path: string, country: string, referrerHost: string): Promise<void> {
-  const stats = await readStats()
-  const day = (stats.views[today()] ??= {})
-  const byCountry = (day[path] ??= {})
-  byCountry[country] = (byCountry[country] || 0) + 1
-  if (referrerHost) {
-    const refs = (stats.referrers[today()] ??= {})
-    refs[referrerHost] = (refs[referrerHost] || 0) + 1
-  }
-  bumpHour(stats, 'views')
-  prune(stats.views)
-  prune(stats.referrers)
-  await writeJson(KEY, stats)
+  await updateJson<StatsFile>(KEY, EMPTY, stats => {
+    const day = (stats.views[today()] ??= {})
+    const byCountry = (day[path] ??= {})
+    byCountry[country] = (byCountry[country] || 0) + 1
+    if (referrerHost) {
+      const refs = (stats.referrers[today()] ??= {})
+      refs[referrerHost] = (refs[referrerHost] || 0) + 1
+    }
+    bumpHour(stats, 'views')
+    prune(stats.views)
+    prune(stats.referrers)
+  })
 }
 
 // The last `hoursBack` hours as a gap-filled series (oldest → newest) for the
