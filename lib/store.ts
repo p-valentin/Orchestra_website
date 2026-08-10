@@ -129,15 +129,18 @@ export async function updateJson<T>(
     mutate(current)
 
     try {
+      const body = encodeBody(current)
       const res = await r2.client.fetch(`${r2.url}/${key}`, {
         method: 'PUT',
-        body: JSON.stringify(current),
+        body,
         headers: {
           'content-type': 'application/json',
+          'content-length': String(body.byteLength),
           // Exactly one of these: match the version we read, or require that
           // nothing exists yet.
           ...(etag ? { 'if-match': etag } : { 'if-none-match': '*' }),
         },
+        cache: 'no-store',
       })
       if (res.ok) return true
       // 412 (and 409, which R2 can return for a racing create) mean another
@@ -191,15 +194,31 @@ export async function listKeys(prefix: string): Promise<string[]> {
   }
 }
 
+// R2 refuses a chunked PUT with 411 Length Required, and a plain string body
+// does not reliably survive the Vercel/Next fetch stack with its Content-Length
+// intact — somewhere in there it becomes a stream and undici falls back to
+// Transfer-Encoding: chunked. Encoding to bytes up front makes the length
+// knowable, so it can be sent explicitly and stay correct for multi-byte
+// characters. cache: 'no-store' keeps Next's patched fetch off the caching path,
+// which is what reconstructs the request in the first place. Observed as every
+// admin save failing in production while reads were fine.
+function encodeBody(data: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(data))
+}
+
 export async function writeJson(key: string, data: unknown): Promise<boolean> {
-  const body = JSON.stringify(data)
+  const body = encodeBody(data)
   const r2 = r2Config()
   if (r2) {
     try {
       const res = await r2.client.fetch(`${r2.url}/${key}`, {
         method: 'PUT',
         body,
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(body.byteLength),
+        },
+        cache: 'no-store',
       })
       if (!res.ok) throw new Error(`R2 write ${key}: ${res.status}`)
       return true
