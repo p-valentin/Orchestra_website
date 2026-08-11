@@ -53,7 +53,12 @@ export async function readJsonChecked<T>(key: string, missing: T): Promise<T | n
   const r2 = r2Config()
   if (r2) {
     try {
-      const res = await r2.client.fetch(`${r2.url}/${key}`)
+      // no-store for the same reason as updateJson's read: Next caches GETs
+      // through its patched fetch, and every caller of this function is about
+      // to mutate what it reads and write it back. Serving that from cache
+      // means writing stale state over current state — the exact class of
+      // silent data loss the rest of this file is built to prevent.
+      const res = await r2.client.fetch(`${r2.url}/${key}`, { cache: 'no-store' })
       if (res.status === 404) return missing
       if (!res.ok) throw new Error(`R2 read ${key}: ${res.status}`)
       return (await res.json()) as T
@@ -107,17 +112,28 @@ export async function updateJson<T>(
     return writeJson(key, current)
   }
 
+  let lastStatus = 0
+  let sawEtag = false
+
   for (let attempt = 0; attempt < attempts; attempt++) {
     let current: T
     let etag: string | null
     try {
-      const res = await r2.client.fetch(`${r2.url}/${key}`)
+      // no-store is load-bearing, not hygiene. Next patches global fetch and
+      // caches GETs, so without it this read can be served from cache — and a
+      // cached read carries a stale etag, or none at all. A stale etag fails
+      // If-Match; a missing one sends If-None-Match: * against an object that
+      // exists, which also fails. Either way the conditional write can never
+      // succeed and every attempt burns, which is what silently stopped the
+      // pageview counter: five 412s in a row, then "gave up", forever.
+      const res = await r2.client.fetch(`${r2.url}/${key}`, { cache: 'no-store' })
       if (res.status === 404) {
         current = missing
         etag = null
       } else if (res.ok) {
         current = (await res.json()) as T
         etag = res.headers.get('etag')
+        if (etag) sawEtag = true
       } else {
         throw new Error(`R2 read ${key}: ${res.status}`)
       }
@@ -146,6 +162,7 @@ export async function updateJson<T>(
       // 412 (and 409, which R2 can return for a racing create) mean another
       // writer got there first. Re-read and reapply.
       if (res.status === 412 || res.status === 409) {
+        lastStatus = res.status
         // Small jittered backoff so simultaneous writers don't lockstep.
         await new Promise(resolve => setTimeout(resolve, 15 + Math.random() * 60))
         continue
@@ -157,7 +174,14 @@ export async function updateJson<T>(
     }
   }
 
-  console.error(`[store] update gave up on ${key} after ${attempts} attempts`)
+  // Says WHY it gave up. "gave up after 5 attempts" alone reads as contention,
+  // which sends you looking for a concurrent writer that does not exist on a
+  // site with this much traffic. The status and whether an etag was ever seen
+  // separate a real race from a precondition that can never pass.
+  console.error(
+    `[store] update gave up on ${key} after ${attempts} attempts ` +
+    `(last status ${lastStatus || 'none'}, etag ${sawEtag ? 'present' : 'never seen'})`,
+  )
   return false
 }
 
