@@ -174,15 +174,33 @@ export async function updateJson<T>(
     }
   }
 
-  // Says WHY it gave up. "gave up after 5 attempts" alone reads as contention,
-  // which sends you looking for a concurrent writer that does not exist on a
-  // site with this much traffic. The status and whether an etag was ever seen
-  // separate a real race from a precondition that can never pass.
+  // Says WHY the conditional path failed. "gave up after 5 attempts" alone
+  // reads as contention, which sends you looking for a concurrent writer that
+  // does not exist on a site with this much traffic. The status and whether an
+  // etag was ever seen separate a real race from a precondition that can never
+  // pass. Observed here: "last status 412, etag present" on every single hit.
   console.error(
-    `[store] update gave up on ${key} after ${attempts} attempts ` +
-    `(last status ${lastStatus || 'none'}, etag ${sawEtag ? 'present' : 'never seen'})`,
+    `[store] conditional write on ${key} failed ${attempts} times ` +
+    `(last status ${lastStatus || 'none'}, etag ${sawEtag ? 'present' : 'never seen'}) — ` +
+    `falling back to an unconditional write`,
   )
-  return false
+
+  // R2 rejects If-Match here even with a freshly-read etag and no second
+  // writer, so the conditional path can never land. Giving up at this point is
+  // what silently zeroed the pageview counter for six days: the increment was
+  // simply dropped, and the hit route's .catch(() => {}) hid it.
+  //
+  // Falling back is safe because the two hazards are not the same. The one that
+  // destroyed data before 01dc4e6 was the FAILED READ — readJson turned any
+  // error into EMPTY and the caller wrote that back over everything.
+  // readJsonChecked closes that, and it is still doing so on the line below:
+  // null means write nothing. What the conditional write additionally bought
+  // was protection against two writers racing, and losing one increment in a
+  // rare race is enormously better than losing every increment always.
+  const current = await readJsonChecked<T>(key, missing)
+  if (current === null) return false
+  mutate(current)
+  return writeJson(key, current)
 }
 
 // Lists object keys under a prefix (e.g. 'site/claims/'). R2 uses S3
